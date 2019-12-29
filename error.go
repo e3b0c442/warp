@@ -19,3 +19,38 @@ func (e *ErrRandIO) Error() string {
 func (e *ErrRandIO) Details() string {
 	return e.Detail
 }
+
+//ErrUnmarshalClientData represents an error unmarshaling a client data JSON
+type ErrUnmarshalClientData struct {
+	Detail string
+}
+
+func (e *ErrUnmarshalClientData) Error() string {
+	return "Client data unmarshal error"
+}
+
+//Details returns the error details
+func (e *ErrUnmarshalClientData) Details() string {
+	return e.Detail
+}
+
+//ErrValidateRegistration represents an error validating a registration attempt.
+//This error may wrap other errors.
+type ErrValidateRegistration struct {
+	Detail string
+	Err    error
+}
+
+func (e *ErrValidateRegistration) Error() string {
+	return "Registration validation error"
+}
+
+//Unwrap implements error wrapping
+func (e *ErrValidateRegistration) Unwrap() error {
+	return e.Err
+}
+
+//Details returns the error details
+func (e *ErrValidateRegistration) Details() string {
+	return e.Detail
+}

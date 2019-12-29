@@ -1,0 +1,27 @@
+<html>
+  <head>
+    <title>WebAuthn Relying Party demo</title>
+  </head>
+  <body>
+    <h1>WebAuth Relying Party demo</h1>
+      <label for="username">Username:</label>
+      <input type="text" id="username">
+      <button id="register-button">Register</button>
+      <button id="authenticate-buton">Authenticate</button>
+  </body>
+  <script>
+    document.getElementById("register-button").addEventListener("click", register, false)
+    async function register(e) {
+      e.preventDefault();
+      const username = document.getElementById("username").value
+      const result = await (await fetch(`/register/start?username=${username}`)).json()
+      console.log(result);
+
+      result.user.id = Uint8Array.from(atob(result.user.id), c => c.charCodeAt(0))
+      result.challenge = Uint8Array.from(atob(result.challenge), c => c.charCodeAt(0))
+
+      const opts = await navigator.credentials.create({publicKey: result});
+      console.log(opts);
+    }
+  </script>
+</html>

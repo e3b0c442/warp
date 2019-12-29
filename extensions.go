@@ -9,6 +9,10 @@ const (
 //values for zero or more extensions. §5.7
 type AuthenticationExtensionsClientInputs map[string]interface{}
 
+//AuthenticationExtensionsClientOutputs containing the client extension output
+//values for zero or more WebAuthn extensions. §5.8
+type AuthenticationExtensionsClientOutputs map[string]interface{}
+
 //Extension defines an extension to a creation options or request options
 //object
 type Extension func(map[string]interface{})
@@ -30,3 +34,6 @@ func AppID(appID string) Extension {
 		e[AppIDIdentifier] = appID
 	}
 }
+
+//ExtensionValidator defines a function which validates an extension output
+type ExtensionValidator func(AuthenticationExtensionsClientOutputs) error

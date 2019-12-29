@@ -1,15 +1,20 @@
 package warp
 
 import (
+	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 //PublicKeyCredentialRpEntity is used to supply additional relying party
 //attributes when creating a new credential - WebAuthn Level 1 TR § 5.4.2
 type PublicKeyCredentialRpEntity struct {
 	Name string `json:"name"`
-	Icon string `json:"icon"`
+	Icon string `json:"icon,omitempty"`
 	ID   string `json:"id"`
 }
 
@@ -17,7 +22,7 @@ type PublicKeyCredentialRpEntity struct {
 //when creating a new credential - § 5.4.3
 type PublicKeyCredentialUserEntity struct {
 	Name        string `json:"name"`
-	Icon        string `json:"icon"`
+	Icon        string `json:"icon,omitempty"`
 	ID          []byte `json:"id"`
 	DisplayName string `json:"displayName"`
 }
@@ -117,11 +122,11 @@ type PublicKeyCredentialCreationOptions struct {
 	User                   PublicKeyCredentialUserEntity        `json:"user"`
 	Challenge              []byte                               `json:"challenge"`
 	PubKeyCredParams       []PublicKeyCredentialParameters      `json:"pubKeyCredParams"`
-	Timeout                uint                                 `json:"timeout"`
-	ExcludeCredentials     []PublicKeyCredentialDescriptor      `json:"excludeCredentials"`
-	AuthenticatorSelection AuthenticatorSelectionCriteria       `json:"authenticatorSelection"`
-	Attestation            AttestationConveyancePreference      `json:"attestation"`
-	Extensions             AuthenticationExtensionsClientInputs `json:"extensions"`
+	Timeout                *uint                                `json:"timeout,omitempty"`
+	ExcludeCredentials     []PublicKeyCredentialDescriptor      `json:"excludeCredentials,omitempty"`
+	AuthenticatorSelection *AuthenticatorSelectionCriteria      `json:"authenticatorSelection,omitempty"`
+	Attestation            *AttestationConveyancePreference     `json:"attestation,omitempty"`
+	Extensions             AuthenticationExtensionsClientInputs `json:"extensions,omitempty"`
 }
 
 //ChallengeLength represents the size of the generated challenge. Must be
@@ -144,9 +149,17 @@ func SupportedPublicKeyCredentialParameters() []PublicKeyCredentialParameters {
 //object.
 type CreationOption func(*PublicKeyCredentialCreationOptions)
 
-//BeginRegister begins the registration process by creating a credential
+//StartRegister starts the registration process by creating a credential
 //creation options object to be sent to the client.
-func BeginRegister(rp RelyingParty, user User, opts ...CreationOption) (*PublicKeyCredentialCreationOptions, error) {
+func StartRegister(
+	rp RelyingParty,
+	user User,
+	opts ...CreationOption,
+) (
+	*PublicKeyCredentialCreationOptions,
+	*SessionData,
+	error,
+) {
 	rpEntity := PublicKeyCredentialRpEntity{
 		Name: rp.RelyingPartyName(),
 		Icon: rp.RelyingPartyIcon(),
@@ -163,10 +176,10 @@ func BeginRegister(rp RelyingParty, user User, opts ...CreationOption) (*PublicK
 	challenge := make([]byte, ChallengeLength)
 	n, err := rand.Read(challenge)
 	if err != nil {
-		return nil, &ErrRandIO{Detail: err.Error()}
+		return nil, nil, &ErrRandIO{Detail: err.Error()}
 	}
 	if n < ChallengeLength {
-		return nil, &ErrRandIO{
+		return nil, nil, &ErrRandIO{
 			Detail: fmt.Sprintf("Read %d random bytes, needed %d", n, ChallengeLength),
 		}
 	}
@@ -180,18 +193,23 @@ func BeginRegister(rp RelyingParty, user User, opts ...CreationOption) (*PublicK
 		PubKeyCredParams: credParams,
 	}
 
+	sessionData := SessionData{
+		Challenge: challenge,
+		Origin:    rp.RelyingPartyOrigin(),
+	}
+
 	for _, opt := range opts {
 		opt(&creationOptions)
 	}
 
-	return &creationOptions, nil
+	return &creationOptions, &sessionData, nil
 }
 
 //Timeout returns a creation option that adds a custom timeout to the creation
 //options object
 func Timeout(timeout uint) CreationOption {
 	return func(co *PublicKeyCredentialCreationOptions) {
-		co.Timeout = timeout
+		co.Timeout = &timeout
 	}
 }
 
@@ -207,7 +225,7 @@ func ExcludeCredentials(creds []PublicKeyCredentialDescriptor) CreationOption {
 //selection criteria to the creation options object
 func AuthenticatorSelection(criteria AuthenticatorSelectionCriteria) CreationOption {
 	return func(co *PublicKeyCredentialCreationOptions) {
-		co.AuthenticatorSelection = criteria
+		co.AuthenticatorSelection = &criteria
 	}
 }
 
@@ -215,14 +233,141 @@ func AuthenticatorSelection(criteria AuthenticatorSelectionCriteria) CreationOpt
 //preference to the creation options object
 func Attestation(pref AttestationConveyancePreference) CreationOption {
 	return func(co *PublicKeyCredentialCreationOptions) {
-		co.Attestation = pref
+		co.Attestation = &pref
 	}
 }
 
-//CreateExtensions returns a creatino option that adds one or more extensions
+//CreateExtensions returns a creation option that adds one or more extensions
 //to the creation options object
 func CreateExtensions(exts AuthenticationExtensionsClientInputs) CreationOption {
 	return func(co *PublicKeyCredentialCreationOptions) {
 		co.Extensions = exts
 	}
+}
+
+//AuthenticatorAttestationResponse represents the authenticator's response to a
+//client’s request for the creation of a new public key credential. §5.2.1
+type AuthenticatorAttestationResponse struct {
+	ClientDataJSON    []byte `json:"clientDataJSON"`
+	AttestationObject []byte `json:"attestationObject"`
+}
+
+//TokenBindingStatus represents a token binding status value. §5.10.1
+type TokenBindingStatus string
+
+//enum values for the TokenBindingStatus type
+const (
+	TokenBindingStatusSupported = "supported"
+	TokenBindingStatusPresent   = "present"
+)
+
+//TokenBinding contains information about the state of the Token Binding
+//protocol used when communicating with the Relying Party. §5.10.1
+type TokenBinding struct {
+	Status TokenBindingStatus `json:"status"`
+	ID     string             `json:"id"`
+}
+
+//CollectedClientData represents the contextual bindings of both the WebAuthn
+//Relying Party and the client. §5.10.1
+type CollectedClientData struct {
+	Type         string        `json:"type"`
+	Challenge    string        `json:"challenge"`
+	Origin       string        `json:"origin"`
+	TokenBinding *TokenBinding `json:"tokenBinding,omitempty"`
+}
+
+//FinishRegistration accepts the authenticator attestation response and
+//extension client outputs and validates the
+func FinishRegistration(
+	sess *SessionData,
+	response AuthenticatorAttestationResponse,
+	exts AuthenticationExtensionsClientOutputs,
+	extValidators ...ExtensionValidator,
+) (
+	*Credential,
+	error,
+) {
+	//Steps defined in §7.1
+
+	//1. Let JSONtext be the result of running UTF-8 decode on the value of
+	//response.clientDataJSON.
+	//TODO research if there are any instances where the byte stream is not
+	//valid JSON per the JSON decoder
+
+	//2. Let C, the client data claimed as collected during the credential
+	//creation, be the result of running an implementation-specific JSON parser
+	//on JSONtext.
+	C := CollectedClientData{}
+	err := json.Unmarshal(response.ClientDataJSON, &C)
+	if err != nil {
+		return nil, &ErrValidateRegistration{
+			Detail: "Unmarshal client data",
+			Err:    &ErrUnmarshalClientData{Detail: err.Error()},
+		}
+	}
+
+	//3. Verify that the value of C.type is webauthn.create.
+	if C.Type != "webauthn.create" {
+		return nil, &ErrValidateRegistration{
+			Detail: "C.type is not webauthn.create",
+		}
+	}
+
+	//4. Verify that the value of C.challenge matches the challenge that was
+	//sent to the authenticator in the create() call.
+	rawChallenge, err := base64.RawURLEncoding.DecodeString(C.Challenge)
+	if err != nil {
+		return nil, &ErrValidateRegistration{
+			Detail: "Decode challenge",
+			Err:    &ErrUnmarshalClientData{Detail: err.Error()},
+		}
+	}
+	if !bytes.Equal(rawChallenge, sess.Challenge) {
+		return nil, &ErrValidateRegistration{
+			Detail: fmt.Sprintf("Challenge mismatch: got [% X] expected [% X]", rawChallenge, sess.Challenge),
+		}
+	}
+
+	//5. Verify that the value of C.origin matches the Relying Party's origin.
+	if !strings.EqualFold(C.Origin, sess.Origin) {
+		return nil, &ErrValidateRegistration{
+			Detail: fmt.Sprintf("Origin mismatch: got %s expected %s", C.Origin, sess.Origin),
+		}
+	}
+
+	//6. Verify that the value of C.tokenBinding.status matches the state of
+	//Token Binding for the TLS connection over which the assertion was
+	//obtained. If Token Binding was used on that TLS connection, also verify
+	//that C.tokenBinding.id matches the base64url encoding of the Token Binding
+	//ID for the connection.
+	if C.TokenBinding != nil {
+		switch C.TokenBinding.Status {
+		case TokenBindingStatusSupported:
+		case TokenBindingStatusPresent:
+			if C.TokenBinding.ID == "" {
+				return nil, &ErrValidateRegistration{
+					Detail: "Token binding status present without ID",
+				}
+				//TODO implement Token Binding validation when support exists in
+				//Golang standard library
+			}
+		default:
+			return nil, &ErrValidateRegistration{
+				Detail: fmt.Sprintf("Invalid token binding status %s", C.TokenBinding.Status),
+			}
+		}
+	}
+
+	//7. Compute the hash of response.clientDataJSON using SHA-256.
+	_ = sha256.Sum256(response.ClientDataJSON)
+
+	//8. Perform CBOR decoding on the attestationObject field of the
+	//AuthenticatorAttestationResponse structure to obtain the attestation
+	//statement format fmt, the authenticator data authData, and the attestation
+	//statement attStmt.
+
+	//
+
+	return nil, nil
 }

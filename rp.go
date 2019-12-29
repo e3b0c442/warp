@@ -6,4 +6,5 @@ type RelyingParty interface {
 	RelyingPartyID() string
 	RelyingPartyName() string
 	RelyingPartyIcon() string
+	RelyingPartyOrigin() string
 }
