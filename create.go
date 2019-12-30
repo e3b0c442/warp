@@ -2,12 +2,18 @@ package warp
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"strings"
+
+	"github.com/fxamacker/cbor"
 )
 
 //PublicKeyCredentialRpEntity is used to supply additional relying party
@@ -277,12 +283,115 @@ type CollectedClientData struct {
 	TokenBinding *TokenBinding `json:"tokenBinding,omitempty"`
 }
 
+//PublicKeyAttestationCredential represents a PublicKeyCredential with an
+//attestation response
+type PublicKeyAttestationCredential struct {
+	ID         string                                `json:"id"`
+	Type       string                                `json:"type"`
+	RawID      string                                `json:"rawId"`
+	Response   AuthenticatorAttestationResponse      `json:"response"`
+	Extensions AuthenticationExtensionsClientOutputs `json:"extensions,omitempty"`
+}
+
+//AttestationObject contains both authenticator data and an attestation
+//statement. §5.2.1
+type AttestationObject struct {
+	AuthData []byte          `cbor:"authData"`
+	Fmt      string          `cbor:"fmt"`
+	AttStmt  cbor.RawMessage `cbor:"attStmt"`
+}
+
+type AttestedCredentialData struct {
+	AAGUID              [16]byte
+	CredentialID        []byte
+	CredentialPublicKey crypto.PublicKey
+}
+
+func (acd AttestedCredentialData) Decode(data io.Reader) error {
+	n, err := data.Read(acd.AAGUID[:])
+	if err != nil {
+		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Read AAGUID failed: %v", err)}
+	}
+	if n < 16 {
+		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Expected 16 bytes of AAGUID data, got %d", n)}
+	}
+
+	var credLen uint16
+	err = binary.Read(data, binary.BigEndian, &credLen)
+	if err != nil {
+		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Unable to read credential length: %v", err)}
+	}
+
+	acd.CredentialID = make([]byte, credLen)
+	n, err = data.Read(acd.CredentialID)
+	if err != nil {
+		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Read credential ID failed: %v", err)}
+	}
+	if n < credLen {
+		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Expected %d bytes of credential ID data, got %d", credLen, n)}
+	}
+}
+
+//AuthenticatorData encodes contextual bindings made by the authenticator. §6.1
+type AuthenticatorData struct {
+	RPIDHash               [32]byte
+	UP                     bool
+	UV                     bool
+	AT                     bool
+	ED                     bool
+	SignCount              uint32
+	AttestedCredentialData AttestedCredentialData
+	Extensions             cbor.RawMessage
+}
+
+//Decode decodes the ad hoc AuthenticatorData structure
+func (ad AuthenticatorData) Decode(data io.Reader) error {
+	n, err := data.Read(ad.RPIDHash[:])
+	if err != nil {
+		return &ErrBadAuthenticatorData{Detail: fmt.Sprintf("Read hash data failed: %v", err)}
+	}
+	if n < 32 {
+		return &ErrBadAuthenticatorData{Detail: fmt.Sprintf("Expected 32 bytes of hash data, got %d", n)}
+	}
+
+	var flags uint8
+	err = binary.Read(data, binary.BigEndian, &flags)
+	if err != nil {
+		return &ErrBadAuthenticatorData{Detail: fmt.Sprintf("Unable to read flag byte: %v", err)}
+	}
+
+	ad.UP = false
+	ad.UV = false
+	ad.AT = false
+	ad.ED = false
+	if flags&0x1 > 0 {
+		ad.UP = true
+	}
+	if flags&0x4 > 0 {
+		ad.UV = true
+	}
+	if flags&0x40 > 0 {
+		ad.AT = true
+	}
+	if flags&0x80 > 0 {
+		ad.ED = true
+	}
+
+	err = binary.Read(data, binary.BigEndian, &ad.SignCount)
+	if err != nil {
+		return &ErrBadAuthenticatorData{Detail: fmt.Sprintf("Unable to read sign count: %v", err)}
+	}
+
+	if ad.AT {
+		err = ad.AttestedCredentialData.Decode(data)
+	}
+}
+
 //FinishRegistration accepts the authenticator attestation response and
 //extension client outputs and validates the
 func FinishRegistration(
 	sess *SessionData,
-	response AuthenticatorAttestationResponse,
-	exts AuthenticationExtensionsClientOutputs,
+	cred PublicKeyAttestationCredential,
 	extValidators ...ExtensionValidator,
 ) (
 	*Credential,
@@ -299,7 +408,7 @@ func FinishRegistration(
 	//creation, be the result of running an implementation-specific JSON parser
 	//on JSONtext.
 	C := CollectedClientData{}
-	err := json.Unmarshal(response.ClientDataJSON, &C)
+	err := json.Unmarshal(cred.Response.ClientDataJSON, &C)
 	if err != nil {
 		return nil, &ErrValidateRegistration{
 			Detail: "Unmarshal client data",
@@ -360,12 +469,18 @@ func FinishRegistration(
 	}
 
 	//7. Compute the hash of response.clientDataJSON using SHA-256.
-	_ = sha256.Sum256(response.ClientDataJSON)
+	_ = sha256.Sum256(cred.Response.ClientDataJSON)
 
 	//8. Perform CBOR decoding on the attestationObject field of the
 	//AuthenticatorAttestationResponse structure to obtain the attestation
 	//statement format fmt, the authenticator data authData, and the attestation
 	//statement attStmt.
+	testCbor := AttestationObject{}
+	err = cbor.Unmarshal(cred.Response.AttestationObject, &testCbor)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("%#v\n", testCbor)
 
 	//
 

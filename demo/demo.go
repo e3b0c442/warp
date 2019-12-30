@@ -63,6 +63,7 @@ func (r rp) RelyingPartyOrigin() string {
 
 var users map[string]*user
 var relyingParty rp
+var sessions map[string]*warp.SessionData
 
 var (
 	bind   string
@@ -102,6 +103,7 @@ func main() {
 		origin: origin,
 	}
 	users = make(map[string]*user)
+	sessions = make(map[string]*warp.SessionData)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		index, err := ioutil.ReadFile("./static/index.html")
@@ -113,6 +115,7 @@ func main() {
 		w.Write(index)
 	})
 	http.HandleFunc("/register/start", startRegister)
+	http.HandleFunc("/register/finish", finishRegister)
 
 	log.Fatal(http.ListenAndServeTLS(bind, cert, key, nil))
 }
@@ -136,15 +139,46 @@ func startRegister(w http.ResponseWriter, r *http.Request) {
 		users[username] = u
 	}
 
-	opts, _, err := warp.StartRegister(relyingParty, u)
+	opts, sess, err := warp.StartRegister(relyingParty, u, warp.Attestation(warp.AttestationConveyancePreferenceIndirect))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Start register fail: %v", err), http.StatusInternalServerError)
 		return
 	}
 
+	sessions[username] = sess
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(opts)
+}
+
+func finishRegister(w http.ResponseWriter, r *http.Request) {
+	usernames, ok := r.URL.Query()["username"]
+	if !ok || len(usernames) == 0 || usernames[0] == "" {
+		http.Error(w, "No username provided", http.StatusBadRequest)
+		return
+	}
+	username := usernames[0]
+	sess, ok := sessions[username]
+	if !ok {
+		http.Error(w, fmt.Sprintf("No session found for %s", username), http.StatusBadRequest)
+		return
+	}
+
+	cred := warp.PublicKeyAttestationCredential{}
+	err := json.NewDecoder(r.Body).Decode(&cred)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Decode credential fail: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	_, err = warp.FinishRegistration(sess, cred)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Unauthorized: %v", err), http.StatusUnauthorized)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func tmpCert(tmpDir string) (string, string, error) {

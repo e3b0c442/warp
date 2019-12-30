@@ -54,3 +54,37 @@ func (e *ErrValidateRegistration) Unwrap() error {
 func (e *ErrValidateRegistration) Details() string {
 	return e.Detail
 }
+
+//ErrBadAuthenticatorData represents an error decoding the authenticator data.
+//This error may wrap other errors
+type ErrBadAuthenticatorData struct {
+	Detail string
+	Err    error
+}
+
+func (e *ErrBadAuthenticatorData) Error() string {
+	return "Bad authenticator data"
+}
+
+//Unwrap implements error wrapping
+func (e *ErrBadAuthenticatorData) Unwrap() error {
+	return e.Err
+}
+
+func (e *ErrBadAuthenticatorData) Details() string {
+	return e.Detail
+}
+
+//ErrBadAttestedCredentialData represents an error decoding the attested
+//credential data
+type ErrBadAttestedCredentialData struct {
+	Detail string
+}
+
+func (e *ErrBadAttestedCredentialData) Error() string {
+	return "Bad attested credential data"
+}
+
+func (e *ErrBadAttestedCredentialData) Details() string {
+	return e.Detail
+}

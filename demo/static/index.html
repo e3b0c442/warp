@@ -4,10 +4,11 @@
   </head>
   <body>
     <h1>WebAuth Relying Party demo</h1>
-      <label for="username">Username:</label>
-      <input type="text" id="username">
-      <button id="register-button">Register</button>
-      <button id="authenticate-buton">Authenticate</button>
+    <label for="username">Username:</label>
+    <input type="text" id="username">
+    <button id="register-button">Register</button>
+    <button id="authenticate-buton">Authenticate</button>
+    <div id="status"></div>
   </body>
   <script>
     document.getElementById("register-button").addEventListener("click", register, false)
@@ -22,6 +23,34 @@
 
       const opts = await navigator.credentials.create({publicKey: result});
       console.log(opts);
+
+      const toSend = {
+        id: opts.id,
+        rawId: btoa(String.fromCharCode.apply(null, new Uint8Array(opts.rawId))),
+        response: {
+          attestationObject: btoa(String.fromCharCode.apply(null, new Uint8Array(opts.response.attestationObject))),
+          clientDataJSON: btoa(String.fromCharCode.apply(null, new Uint8Array(opts.response.clientDataJSON)))
+        }
+      }
+      if(opts.extensions) {
+        toSend.extensions = opts.extensions;
+      }
+    
+      const resp = await fetch(`/register/finish?username=${username}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(toSend)
+      });
+
+      if(resp.ok) {
+        document.getElementById("status").innerText = "Registration success"
+      } else {
+        const err = await resp.text();
+        document.getElementById("status").innerText = `Registration failed: ${err}`
+      }
+
     }
   </script>
 </html>
