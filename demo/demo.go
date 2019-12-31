@@ -139,7 +139,7 @@ func startRegister(w http.ResponseWriter, r *http.Request) {
 		users[username] = u
 	}
 
-	opts, sess, err := warp.StartRegister(relyingParty, u, warp.Attestation(warp.AttestationConveyancePreferenceIndirect))
+	opts, sess, err := warp.StartRegister(relyingParty, u, warp.Attestation(warp.AttestationConveyancePreferenceDirect))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Start register fail: %v", err), http.StatusInternalServerError)
 		return
@@ -175,6 +175,10 @@ func finishRegister(w http.ResponseWriter, r *http.Request) {
 	_, err = warp.FinishRegistration(sess, cred)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Unauthorized: %v", err), http.StatusUnauthorized)
+		log.Printf("%v", err)
+		if e, ok := err.(warp.DetailedError); ok {
+			log.Printf("%s", e.Details())
+		}
 		return
 	}
 

@@ -199,13 +199,13 @@ func StartRegister(
 		PubKeyCredParams: credParams,
 	}
 
-	sessionData := SessionData{
-		Challenge: challenge,
-		Origin:    rp.RelyingPartyOrigin(),
-	}
-
 	for _, opt := range opts {
 		opt(&creationOptions)
+	}
+
+	sessionData := SessionData{
+		Origin:          rp.RelyingPartyOrigin(),
+		CreationOptions: &creationOptions,
 	}
 
 	return &creationOptions, &sessionData, nil
@@ -301,13 +301,30 @@ type AttestationObject struct {
 	AttStmt  cbor.RawMessage `cbor:"attStmt"`
 }
 
+//COSEKey represents a key decoded from COSE format.
+type COSEKey struct {
+	Kty       int             `cbor:"1,keyasint,omitempty"`
+	Kid       []byte          `cbor:"2,keyasint,omitempty"`
+	Alg       int             `cbor:"3,keyasint,omitempty"`
+	KeyOpts   int             `cbor:"4,keyasint,omitempty"`
+	IV        []byte          `cbor:"5,keyasint,omitempty"`
+	CrvOrNOrK cbor.RawMessage `cbor:"-1,keyasint,omitempty"` // K for symmetric keys, Crv for elliptic curve keys, N for RSA modulus
+	XOrE      cbor.RawMessage `cbor:"-2,keyasint,omitempty"` // X for curve x-coordinate, E for RSA public exponent
+	Y         cbor.RawMessage `cbor:"-3,keyasint,omitempty"` // Y for curve y-cooridate
+	D         []byte          `cbor:"-4,keyasint,omitempty"`
+}
+
+//AttestedCredentialData is a variable-length byte array added to the
+//authenticator data when generating an attestation object for a given
+//credential. §6.4.1
 type AttestedCredentialData struct {
 	AAGUID              [16]byte
 	CredentialID        []byte
 	CredentialPublicKey crypto.PublicKey
 }
 
-func (acd AttestedCredentialData) Decode(data io.Reader) error {
+//Decode decodes the attested credential data from a stream
+func (acd *AttestedCredentialData) Decode(data io.Reader) error {
 	n, err := data.Read(acd.AAGUID[:])
 	if err != nil {
 		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Read AAGUID failed: %v", err)}
@@ -327,9 +344,19 @@ func (acd AttestedCredentialData) Decode(data io.Reader) error {
 	if err != nil {
 		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Read credential ID failed: %v", err)}
 	}
-	if n < credLen {
+	if uint16(n) < credLen {
 		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Expected %d bytes of credential ID data, got %d", credLen, n)}
 	}
+
+	var credPK COSEKey
+	err = cbor.NewDecoder(data).Decode(&credPK)
+	if err != nil {
+		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Unable to unmarshal COSE key: %v", err)}
+	}
+
+	log.Printf("%#v", credPK)
+
+	return nil
 }
 
 //AuthenticatorData encodes contextual bindings made by the authenticator. §6.1
@@ -341,11 +368,11 @@ type AuthenticatorData struct {
 	ED                     bool
 	SignCount              uint32
 	AttestedCredentialData AttestedCredentialData
-	Extensions             cbor.RawMessage
+	Extensions             map[string]interface{}
 }
 
 //Decode decodes the ad hoc AuthenticatorData structure
-func (ad AuthenticatorData) Decode(data io.Reader) error {
+func (ad *AuthenticatorData) Decode(data io.Reader) error {
 	n, err := data.Read(ad.RPIDHash[:])
 	if err != nil {
 		return &ErrBadAuthenticatorData{Detail: fmt.Sprintf("Read hash data failed: %v", err)}
@@ -384,7 +411,19 @@ func (ad AuthenticatorData) Decode(data io.Reader) error {
 
 	if ad.AT {
 		err = ad.AttestedCredentialData.Decode(data)
+		if err != nil {
+			return &ErrBadAuthenticatorData{Err: err}
+		}
 	}
+
+	if ad.ED {
+		err = cbor.NewDecoder(data).Decode(&ad.Extensions)
+		if err != nil {
+			return &ErrBadAuthenticatorData{Detail: fmt.Sprintf("Unable to decode extensions: %v", err)}
+		}
+	}
+
+	return nil
 }
 
 //FinishRegistration accepts the authenticator attestation response and
@@ -432,9 +471,9 @@ func FinishRegistration(
 			Err:    &ErrUnmarshalClientData{Detail: err.Error()},
 		}
 	}
-	if !bytes.Equal(rawChallenge, sess.Challenge) {
+	if !bytes.Equal(rawChallenge, sess.CreationOptions.Challenge) {
 		return nil, &ErrValidateRegistration{
-			Detail: fmt.Sprintf("Challenge mismatch: got [% X] expected [% X]", rawChallenge, sess.Challenge),
+			Detail: fmt.Sprintf("Challenge mismatch: got [% X] expected [% X]", rawChallenge, sess.CreationOptions.Challenge),
 		}
 	}
 
@@ -475,14 +514,38 @@ func FinishRegistration(
 	//AuthenticatorAttestationResponse structure to obtain the attestation
 	//statement format fmt, the authenticator data authData, and the attestation
 	//statement attStmt.
-	testCbor := AttestationObject{}
-	err = cbor.Unmarshal(cred.Response.AttestationObject, &testCbor)
+	attestationObj := AttestationObject{}
+	err = cbor.Unmarshal(cred.Response.AttestationObject, &attestationObj)
 	if err != nil {
-		return nil, err
+		return nil, &ErrValidateRegistration{Err: err}
 	}
-	log.Printf("%#v\n", testCbor)
+	var authData AuthenticatorData
+	err = authData.Decode(bytes.NewBuffer(attestationObj.AuthData))
+	if err != nil {
+		return nil, &ErrValidateRegistration{Err: err}
+	}
+	log.Printf("%#v", authData)
 
-	//
+	//9. Verify that the rpIdHash in authData is the SHA-256 hash of the RP ID
+	//expected by the Relying Party.
+	rpIDHash := sha256.Sum256([]byte(sess.CreationOptions.RP.ID))
+	if !bytes.Equal(rpIDHash[:], authData.RPIDHash[:]) {
+		return nil, &ErrValidateRegistration{Detail: fmt.Sprintf("RPID hash does not match authData (RPID: %s)", sess.CreationOptions.RP.ID)}
+	}
+
+	//10. Verify that the User Present bit of the flags in authData is set.
+	if !authData.UP {
+		return nil, &ErrValidateRegistration{Detail: "User Presennt bit not set"}
+	}
+
+	//11. If user verification is required for this registration, verify that
+	//the User Verified bit of the flags in authData is set.
+	if sess.CreationOptions.AuthenticatorSelection != nil &&
+		sess.CreationOptions.AuthenticatorSelection.UserVerification == UserVerificationRequirementRequired {
+		if !authData.UV {
+			return nil, &ErrValidateRegistration{Detail: "User Verification required but missing"}
+		}
+	}
 
 	return nil, nil
 }
