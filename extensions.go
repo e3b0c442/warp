@@ -2,7 +2,7 @@ package warp
 
 //Identifiers for defined extensions
 const (
-	AppIDIdentifier = "appid"
+	ExtensionAppID = "appid"
 )
 
 //AuthenticationExtensionsClientInputs contains the client extension input
@@ -28,12 +28,40 @@ func Extensions(exts ...Extension) AuthenticationExtensionsClientInputs {
 	return extensions
 }
 
-//AppID adds the appid extension to the extensions object. §10.1
-func AppID(appID string) Extension {
+//UseAppID adds the appid extension to the extensions object. §10.1
+func UseAppID(appID string) Extension {
 	return func(e map[string]interface{}) {
-		e[AppIDIdentifier] = appID
+		e[ExtensionAppID] = appID
 	}
 }
 
 //ExtensionValidator defines a function which validates an extension output
-type ExtensionValidator func(AuthenticationExtensionsClientOutputs) error
+type ExtensionValidator func(interface{}, interface{}) error
+
+//ExtensionValidators is a map to all implemented extension validators
+var ExtensionValidators map[string]ExtensionValidator = map[string]ExtensionValidator{
+	ExtensionAppID: VerifyAppID,
+}
+
+//VerifyAppID verifies the AppID extension response
+func VerifyAppID(_, out interface{}) error {
+	if _, ok := out.(bool); ok {
+		return nil
+	}
+	return &ErrClientExtensionVerification{Detail: "Invalid AppID output value"}
+}
+
+//EffectiveRPID returns the effective relying party ID for the ceremony based on
+//the usage of the AppID extension
+func EffectiveRPID(opts *PublicKeyCredentialCreationOptions, cred *AttestationPublicKeyCredential) string {
+	if credV, ok := cred.Extensions[ExtensionAppID]; ok {
+		if useAppID, ok := credV.(bool); ok && useAppID {
+			if optsV, ok := opts.Extensions[ExtensionAppID]; ok {
+				if appID, ok := optsV.(string); ok {
+					return appID
+				}
+			}
+		}
+	}
+	return opts.RP.ID
+}

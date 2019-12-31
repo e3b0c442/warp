@@ -49,8 +49,8 @@ type AuthenticatorAttachment string
 
 //enum values for AuthenticatorAttachment type
 const (
-	Platform      AuthenticatorAttachment = "platform"
-	CrossPlatform AuthenticatorAttachment = "cross-platform"
+	AttachmentPlatform      AuthenticatorAttachment = "platform"
+	AttachmentCrossPlatform AuthenticatorAttachment = "cross-platform"
 )
 
 //AttestationConveyancePreference may be used by relying parties to specify
@@ -60,7 +60,7 @@ type AttestationConveyancePreference string
 
 //enum values for AttestationConveyancePreference type
 const (
-	None     AttestationConveyancePreference = "none"
-	Indirect AttestationConveyancePreference = "indirect"
-	Direct   AttestationConveyancePreference = "direct"
+	ConveyanceNone     AttestationConveyancePreference = "none"
+	ConveyanceIndirect AttestationConveyancePreference = "indirect"
+	ConveyanceDirect   AttestationConveyancePreference = "direct"
 )

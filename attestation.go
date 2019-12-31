@@ -13,9 +13,38 @@ import (
 //AttestationObject contains both authenticator data and an attestation
 //statement.
 type AttestationObject struct {
-	AuthData []byte          `cbor:"authData"`
-	Fmt      string          `cbor:"fmt"`
-	AttStmt  cbor.RawMessage `cbor:"attStmt"`
+	AuthData []byte                     `cbor:"authData"`
+	Fmt      AttestationStatementFormat `cbor:"fmt"`
+	AttStmt  cbor.RawMessage            `cbor:"attStmt"`
+}
+
+//AttestationStatementFormat is the identifier for an attestation statement
+//format.
+type AttestationStatementFormat string
+
+//enum values for AttestationStatementFormat
+const (
+	StatementPacked           AttestationStatementFormat = "packed"
+	StatementTPM              AttestationStatementFormat = "tpm"
+	StatementAndroidKey       AttestationStatementFormat = "android-key"
+	StatementAndroidSafetyNet AttestationStatementFormat = "android-safetynet"
+	StatementFidoU2F          AttestationStatementFormat = "fido-u2f"
+	StatementNone             AttestationStatementFormat = "none"
+)
+
+//Valid determines if the Attestation Format Identifier is a valid value
+func (asf AttestationStatementFormat) Valid() bool {
+	switch asf {
+	case StatementPacked:
+	case StatementTPM:
+	case StatementAndroidKey:
+	case StatementAndroidSafetyNet:
+	case StatementFidoU2F:
+	case StatementNone:
+	default:
+		return false
+	}
+	return true
 }
 
 //AttestedCredentialData is a variable-length byte array added to the

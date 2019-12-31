@@ -71,6 +71,7 @@ func (e *ErrBadAuthenticatorData) Unwrap() error {
 	return e.Err
 }
 
+//Details returns the error details
 func (e *ErrBadAuthenticatorData) Details() string {
 	return e.Detail
 }
@@ -85,6 +86,21 @@ func (e *ErrBadAttestedCredentialData) Error() string {
 	return "Bad attested credential data"
 }
 
+//Details returns the error details
 func (e *ErrBadAttestedCredentialData) Details() string {
+	return e.Detail
+}
+
+//ErrClientExtensionVerification represents an error verifying extension outputs
+type ErrClientExtensionVerification struct {
+	Detail string
+}
+
+func (e *ErrClientExtensionVerification) Error() string {
+	return "Error verifying client extension output"
+}
+
+//Details returns the error details
+func (e *ErrClientExtensionVerification) Details() string {
 	return e.Detail
 }

@@ -77,7 +77,7 @@ func SupportedPublicKeyCredentialParameters() []PublicKeyCredentialParameters {
 	return []PublicKeyCredentialParameters{
 		{
 			Type: PublicKey,
-			Alg:  ES256,
+			Alg:  AlgorithmES256,
 		},
 	}
 }
@@ -119,11 +119,11 @@ func Attestation(pref AttestationConveyancePreference) CreationOption {
 	}
 }
 
-//CreateExtensions returns a creation option that adds one or more extensions
+//CreationExtensions returns a creation option that adds one or more extensions
 //to the creation options object
-func CreateExtensions(exts AuthenticationExtensionsClientInputs) CreationOption {
+func CreationExtensions(exts ...Extension) CreationOption {
 	return func(co *PublicKeyCredentialCreationOptions) {
-		co.Extensions = exts
+		co.Extensions = Extensions(exts...)
 	}
 }
 
@@ -134,7 +134,6 @@ func FinishRegistration(
 	rp RelyingParty,
 	opts *PublicKeyCredentialCreationOptions,
 	cred *AttestationPublicKeyCredential,
-	extValidators ...ExtensionValidator,
 ) (
 	*WebAuthnCredential,
 	error,
@@ -193,13 +192,13 @@ func FinishRegistration(
 	}
 
 	//7. Compute the hash of response.clientDataJSON using SHA-256.
-	_ = sha256.Sum256(cred.Response.ClientDataJSON)
+	clientDataHash := sha256.Sum256(cred.Response.ClientDataJSON)
 
 	//8. Perform CBOR decoding on the attestationObject field of the
 	//AuthenticatorAttestationResponse structure to obtain the attestation
 	//statement format fmt, the authenticator data authData, and the attestation
 	//statement attStmt.
-	authData, _, _, err := decodeAttestationObject(cred)
+	authData, attStmtFmt, _, err := decodeAttestationObject(cred)
 	if err != nil {
 		return nil, &ErrValidateRegistration{
 			Detail: "Decode attestation object failed",
@@ -209,7 +208,7 @@ func FinishRegistration(
 
 	//9. Verify that the rpIdHash in authData is the SHA-256 hash of the RP ID
 	//expected by the Relying Party.
-	if err := verifyRPIDHash(rp, authData); err != nil {
+	if err := verifyRPIDHash(opts.RP.ID, authData); err != nil {
 		return nil, &ErrValidateRegistration{
 			Detail: "Relying Party ID hash mismatch",
 			Err:    err,
@@ -229,6 +228,36 @@ func FinishRegistration(
 			return nil, &ErrValidateRegistration{Detail: "User Verification required but missing"}
 		}
 	}
+
+	//12. Verify that the values of the client extension outputs in
+	//clientExtensionResults and the authenticator extension outputs in the
+	//extensions in authData are as expected, considering the client extension
+	//input values that were given as the extensions option in the create()
+	//call. In particular, any extension identifier values in the
+	//clientExtensionResults and the extensions in authData MUST be also be
+	//present as extension identifier values in the extensions member of
+	//options, i.e., no extensions are present that were not requested. In the
+	//general case, the meaning of "are as expected" is specific to the Relying
+	//Party and which extensions are in use.
+	if err := verifyClientExtensionsOutputs(opts, cred); err != nil {
+		return nil, &ErrValidateRegistration{Detail: "Client extension outputs verification failed"}
+	}
+
+	//13. Determine the attestation statement format by performing a USASCII
+	//case-sensitive match on fmt against the set of supported WebAuthn
+	//Attestation Statement Format Identifier values. An up-to-date list of
+	//registered WebAuthn Attestation Statement Format Identifier values is
+	//maintained in the IANA registry of the same name [WebAuthn-Registries].
+	if !attStmtFmt.Valid() {
+		return nil, &ErrValidateRegistration{
+			Detail: fmt.Sprintf("Invalid attestation statement format %s", attStmtFmt),
+		}
+	}
+
+	//14. Verify that attStmt is a correct attestation statement, conveying a
+	//valid attestation signature, by using the attestation statement format
+	//fmt’s verification procedure given attStmt, authData and the hash of the
+	//serialized client data computed in step 7.
 
 	return &WebAuthnCredential{}, nil
 }
@@ -250,8 +279,8 @@ func compareChallenge(C *CollectedClientData, opts *PublicKeyCredentialCreationO
 func verifyTokenBinding(C *CollectedClientData, opts *PublicKeyCredentialCreationOptions) error {
 	if C.TokenBinding != nil {
 		switch C.TokenBinding.Status {
-		case Supported:
-		case Present:
+		case StatusSupported:
+		case StatusPresent:
 			if C.TokenBinding.ID == "" {
 				return &ErrValidateRegistration{
 					Detail: "Token binding status present without ID",
@@ -268,7 +297,7 @@ func verifyTokenBinding(C *CollectedClientData, opts *PublicKeyCredentialCreatio
 	return nil
 }
 
-func decodeAttestationObject(cred *AttestationPublicKeyCredential) (*AuthenticatorData, string, []byte, error) {
+func decodeAttestationObject(cred *AttestationPublicKeyCredential) (*AuthenticatorData, AttestationStatementFormat, []byte, error) {
 	attestationObj := AttestationObject{}
 	err := cbor.Unmarshal(cred.Response.AttestationObject, &attestationObj)
 	if err != nil {
@@ -284,10 +313,31 @@ func decodeAttestationObject(cred *AttestationPublicKeyCredential) (*Authenticat
 	return &authData, attestationObj.Fmt, []byte(attestationObj.AttStmt), nil
 }
 
-func verifyRPIDHash(rp RelyingParty, authData *AuthenticatorData) error {
-	rpIDHash := sha256.Sum256([]byte(rp.RelyingPartyID()))
+func verifyRPIDHash(RPID string, authData *AuthenticatorData) error {
+	rpIDHash := sha256.Sum256([]byte(RPID))
 	if !bytes.Equal(rpIDHash[:], authData.RPIDHash[:]) {
-		return &ErrValidateRegistration{Detail: fmt.Sprintf("RPID hash does not match authData (RPID: %s)", rp.RelyingPartyID())}
+		return &ErrValidateRegistration{
+			Detail: fmt.Sprintf("RPID hash does not match authData (RPID: %s)", RPID),
+		}
+	}
+	return nil
+}
+
+func verifyClientExtensionsOutputs(opts *PublicKeyCredentialCreationOptions, cred *AttestationPublicKeyCredential) error {
+	for k, credV := range cred.Extensions {
+		optsV, ok := opts.Extensions[k]
+		if !ok {
+			return &ErrValidateRegistration{
+				Detail: fmt.Sprintf("Extension key %s provided in credential but not creation options", k),
+			}
+		}
+
+		if validator, ok := ExtensionValidators[k]; ok { //ignore if no validator
+			err := validator(optsV, credV)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

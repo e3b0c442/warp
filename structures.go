@@ -21,8 +21,8 @@ type TokenBindingStatus string
 
 //enum values for the TokenBindingStatus type
 const (
-	Supported = "supported"
-	Present   = "present"
+	StatusSupported = "supported"
+	StatusPresent   = "present"
 )
 
 //PublicKeyCredentialType defines the valid credential types.
@@ -49,10 +49,10 @@ type AuthenticatorTransport string
 
 //enum values for AuthenticatorTransport type
 const (
-	USB      AuthenticatorTransport = "usb"
-	NFC      AuthenticatorTransport = "nfc"
-	BLE      AuthenticatorTransport = "ble"
-	Internal AuthenticatorTransport = "internal"
+	TransportUSB      AuthenticatorTransport = "usb"
+	TransportNFC      AuthenticatorTransport = "nfc"
+	TransportBLE      AuthenticatorTransport = "ble"
+	TransportInternal AuthenticatorTransport = "internal"
 )
 
 //COSEAlgorithmIdentifier is a number identifying a cryptographic algorithm
@@ -60,7 +60,7 @@ type COSEAlgorithmIdentifier int
 
 //enum values for COSEAlgorithmIdentifier type
 const (
-	ES256 COSEAlgorithmIdentifier = -7
+	AlgorithmES256 COSEAlgorithmIdentifier = -7
 )
 
 //UserVerificationRequirement describes relying party user verification
