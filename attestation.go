@@ -2,10 +2,10 @@ package warp
 
 import (
 	"crypto"
+	"crypto/x509"
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/fxamacker/cbor"
 )
@@ -87,8 +87,6 @@ func (acd *AttestedCredentialData) Decode(data io.Reader) error {
 		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Unable to unmarshal COSE key: %v", err)}
 	}
 
-	log.Printf("%#v", credPK)
-
 	return nil
 }
 
@@ -103,4 +101,57 @@ type COSEKey struct {
 	XOrE      cbor.RawMessage `cbor:"-2,keyasint,omitempty"` // X for curve x-coordinate, E for RSA public exponent
 	Y         cbor.RawMessage `cbor:"-3,keyasint,omitempty"` // Y for curve y-cooridate
 	D         []byte          `cbor:"-4,keyasint,omitempty"`
+}
+
+//VerifyNoneAttestationStatement verifies that at attestation statement of type
+//"none" is valid
+func VerifyNoneAttestationStatement(attStmt cbor.RawMessage, _ []byte, _ [32]byte) error {
+	if len(attStmt) > 0 {
+		return &ErrAttestationVerification{Detail: "Attestation format none with non-empty statement"}
+	}
+	return nil
+}
+
+//PackedAttestationStatement represents a decoded attestation statement of
+//"packed" format
+type PackedAttestationStatement struct {
+	Alg        COSEAlgorithmIdentifier `cbor:"alg"`
+	Sig        []byte                  `cbor:"sig"`
+	X5C        [][]byte                `cbor:"x5c"`
+	ECDAAKeyID []byte                  `cbor:"ecdaaKeyId"`
+}
+
+//VerifyPackedAttestationStatement verifies that an attestation statement of
+//type "packed" is valid
+func VerifyPackedAttestationStatement(rawAttStmt cbor.RawMessage, authData []byte, clientData [32]byte) error {
+	//1. Verify that attStmt is valid CBOR conforming to the syntax defined
+	//above and perform CBOR decoding on it to extract the contained fields.
+	var attStmt PackedAttestationStatement
+	err := cbor.Unmarshal(rawAttStmt, &attStmt)
+	if err != nil {
+		return &ErrAttestationVerification{
+			Detail: fmt.Sprintf("Unable to decode packed attestation statement: %v", err),
+		}
+	}
+
+	//2. If x5c is present, this indicates that the attestation type is not
+	//ECDAA. In this case:
+	if len(attStmt.X5C) > 0 {
+		//Verify that sig is a valid signature over the concatenation of
+		//authenticatorData and clientDataHash using the attestation public key
+		//in attestnCert with the algorithm specified in alg.
+
+		switch attStmt.Alg {
+		case AlgorithmES256:
+			pubKey, err := x509.ParsePKIXPublicKey(attStmt.X5C[0])
+			if err != nil {
+				return &ErrAttestationVerification{
+					Detail: fmt.Sprintf("Unable to parse attestation public key: %v", err),
+				}
+			}
+
+		}
+	}
+
+	return nil
 }

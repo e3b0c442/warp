@@ -69,7 +69,7 @@ type UserVerificationRequirement string
 
 //enum values for UserVerificationRequirement type
 const (
-	Required    UserVerificationRequirement = "required"
-	Preferred   UserVerificationRequirement = "preferred"
-	Discouraged UserVerificationRequirement = "discouraged"
+	VerificationRequired    UserVerificationRequirement = "required"
+	VerificationPreferred   UserVerificationRequirement = "preferred"
+	VerificationDiscouraged UserVerificationRequirement = "discouraged"
 )

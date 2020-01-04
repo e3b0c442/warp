@@ -104,3 +104,18 @@ func (e *ErrClientExtensionVerification) Error() string {
 func (e *ErrClientExtensionVerification) Details() string {
 	return e.Detail
 }
+
+//ErrAttestationVerification represents an error verifying at attestation
+//statement
+type ErrAttestationVerification struct {
+	Detail string
+}
+
+func (e *ErrAttestationVerification) Error() string {
+	return "Error verifying attestation verification"
+}
+
+//Details returns the error details
+func (e *ErrAttestationVerification) Details() string {
+	return e.Detail
+}

@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/fxamacker/cbor"
@@ -74,12 +73,17 @@ func StartRegistration(
 //SupportedPublicKeyCredentialParameters enumerates the credential types and
 //algorithms currently supported by this library.
 func SupportedPublicKeyCredentialParameters() []PublicKeyCredentialParameters {
-	return []PublicKeyCredentialParameters{
-		{
+	supportedAlgs := SupportedKeyAlgorithms()
+	params := make([]PublicKeyCredentialParameters, len(supportedAlgs))
+
+	for i, alg := range supportedAlgs {
+		params[i] = PublicKeyCredentialParameters{
 			Type: PublicKey,
-			Alg:  AlgorithmES256,
-		},
+			Alg:  alg,
+		}
 	}
+
+	return params
 }
 
 //CreationOption is a function that can be passed as a parameter to the
@@ -146,7 +150,6 @@ func FinishRegistration(
 	//2. Let C, the client data claimed as collected during the credential
 	//creation, be the result of running an implementation-specific JSON parser
 	//on JSONtext.
-	log.Printf("%#v", cred)
 	C := CollectedClientData{}
 	err := json.Unmarshal(cred.Response.ClientDataJSON, &C)
 	if err != nil {
@@ -198,10 +201,17 @@ func FinishRegistration(
 	//AuthenticatorAttestationResponse structure to obtain the attestation
 	//statement format fmt, the authenticator data authData, and the attestation
 	//statement attStmt.
-	authData, attStmtFmt, _, err := decodeAttestationObject(cred)
+	rawAuthData, attStmtFmt, attStmt, err := decodeAttestationObject(cred)
 	if err != nil {
 		return nil, &ErrValidateRegistration{
 			Detail: "Decode attestation object failed",
+			Err:    err,
+		}
+	}
+	authData, err := decodeAuthData(rawAuthData)
+	if err != nil {
+		return nil, &ErrValidateRegistration{
+			Detail: "Decode authenticator data failed",
 			Err:    err,
 		}
 	}
@@ -223,7 +233,7 @@ func FinishRegistration(
 	//11. If user verification is required for this registration, verify that
 	//the User Verified bit of the flags in authData is set.
 	if opts.AuthenticatorSelection != nil &&
-		opts.AuthenticatorSelection.UserVerification == Required {
+		opts.AuthenticatorSelection.UserVerification == VerificationRequired {
 		if !authData.UV {
 			return nil, &ErrValidateRegistration{Detail: "User Verification required but missing"}
 		}
@@ -258,7 +268,12 @@ func FinishRegistration(
 	//valid attestation signature, by using the attestation statement format
 	//fmt’s verification procedure given attStmt, authData and the hash of the
 	//serialized client data computed in step 7.
-
+	if err := verifyAttestationStatement(attStmtFmt, attStmt, rawAuthData, clientDataHash); err != nil {
+		return nil, &ErrValidateRegistration{
+			Detail: "Attestation verification failed",
+			Err:    err,
+		}
+	}
 	return &WebAuthnCredential{}, nil
 }
 
@@ -297,20 +312,23 @@ func verifyTokenBinding(C *CollectedClientData, opts *PublicKeyCredentialCreatio
 	return nil
 }
 
-func decodeAttestationObject(cred *AttestationPublicKeyCredential) (*AuthenticatorData, AttestationStatementFormat, []byte, error) {
+func decodeAttestationObject(cred *AttestationPublicKeyCredential) ([]byte, AttestationStatementFormat, cbor.RawMessage, error) {
 	attestationObj := AttestationObject{}
 	err := cbor.Unmarshal(cred.Response.AttestationObject, &attestationObj)
 	if err != nil {
-		return nil, "", nil, &ErrValidateRegistration{Err: err}
+		return nil, "", nil, err
 	}
 
+	return attestationObj.AuthData, attestationObj.Fmt, attestationObj.AttStmt, nil
+}
+
+func decodeAuthData(raw []byte) (*AuthenticatorData, error) {
 	var authData AuthenticatorData
-	err = authData.Decode(bytes.NewBuffer(attestationObj.AuthData))
+	err := authData.Decode(bytes.NewBuffer(raw))
 	if err != nil {
-		return nil, "", nil, &ErrValidateRegistration{Err: err}
+		return nil, err
 	}
-
-	return &authData, attestationObj.Fmt, []byte(attestationObj.AttStmt), nil
+	return &authData, nil
 }
 
 func verifyRPIDHash(RPID string, authData *AuthenticatorData) error {
@@ -340,4 +358,20 @@ func verifyClientExtensionsOutputs(opts *PublicKeyCredentialCreationOptions, cre
 		}
 	}
 	return nil
+}
+
+func verifyAttestationStatement(
+	fmt AttestationStatementFormat,
+	attStmt cbor.RawMessage,
+	authData []byte,
+	clientData [32]byte,
+) error {
+	switch fmt {
+	case StatementNone:
+		return VerifyNoneAttestationStatement(attStmt, authData, clientData)
+	case StatementPacked:
+		return VerifyPackedAttestationStatement(attStmt, authData, clientData)
+	}
+
+	return &ErrAttestationVerification{Detail: "Unsupported attestation format"}
 }
