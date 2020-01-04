@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -46,12 +47,12 @@ func StartRegistration(
 	challenge := make([]byte, ChallengeLength)
 	n, err := rand.Read(challenge)
 	if err != nil {
-		return nil, &ErrRandIO{Detail: err.Error()}
+		return nil, ErrGenerateChallenge.Wrap(err)
 	}
 	if n < ChallengeLength {
-		return nil, &ErrRandIO{
-			Detail: fmt.Sprintf("Read %d random bytes, needed %d", n, ChallengeLength),
-		}
+		return nil, ErrGenerateChallenge.Wrap(
+			fmt.Errorf("Read %d random bytes, needed %d", n, ChallengeLength),
+		)
 	}
 
 	credParams := SupportedPublicKeyCredentialParameters()
@@ -153,33 +154,25 @@ func FinishRegistration(
 	C := CollectedClientData{}
 	err := json.Unmarshal(cred.Response.ClientDataJSON, &C)
 	if err != nil {
-		return nil, &ErrValidateRegistration{
-			Detail: "Unmarshal client data ",
-			Err:    &ErrUnmarshalClientData{Detail: err.Error()},
-		}
+		return nil, ErrVerifyRegistration.Wrap(ErrUnmarshalClientData.Wrap(err))
 	}
 
 	//3. Verify that the value of C.type is webauthn.create.
 	if C.Type != "webauthn.create" {
-		return nil, &ErrValidateRegistration{
-			Detail: "C.type is not webauthn.create",
-		}
+		return nil, ErrVerifyRegistration.Wrap(errors.New("C.type is not webauthn.create"))
 	}
-
+	
 	//4. Verify that the value of C.challenge matches the challenge that was
 	//sent to the authenticator in the create() call.
 	if err = compareChallenge(&C, opts); err != nil {
-		return nil, &ErrValidateRegistration{
-			Detail: "Challenge comparison failed",
-			Err:    err,
-		}
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//5. Verify that the value of C.origin matches the Relying Party's origin.
 	if !strings.EqualFold(C.Origin, rp.RelyingPartyOrigin()) {
-		return nil, &ErrValidateRegistration{
-			Detail: fmt.Sprintf("Origin mismatch: got %s expected %s", C.Origin, rp.RelyingPartyOrigin()),
-		}
+		return nil, ErrVerifyRegistration.Wrap(
+			fmt.Errorf("Origin mismatch: got %s expected %s", C.Origin, rp.RelyingPartyOrigin()),
+		)
 	}
 
 	//6. Verify that the value of C.tokenBinding.status matches the state of
@@ -188,10 +181,7 @@ func FinishRegistration(
 	//that C.tokenBinding.id matches the base64url encoding of the Token Binding
 	//ID for the connection.
 	if err = verifyTokenBinding(&C, opts); err != nil {
-		return nil, &ErrValidateRegistration{
-			Detail: "Token binding verification failed",
-			Err:    err,
-		}
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//7. Compute the hash of response.clientDataJSON using SHA-256.
@@ -203,39 +193,31 @@ func FinishRegistration(
 	//statement attStmt.
 	rawAuthData, attStmtFmt, attStmt, err := decodeAttestationObject(cred)
 	if err != nil {
-		return nil, &ErrValidateRegistration{
-			Detail: "Decode attestation object failed",
-			Err:    err,
-		}
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 	authData, err := decodeAuthData(rawAuthData)
 	if err != nil {
-		return nil, &ErrValidateRegistration{
-			Detail: "Decode authenticator data failed",
-			Err:    err,
-		}
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//9. Verify that the rpIdHash in authData is the SHA-256 hash of the RP ID
 	//expected by the Relying Party.
 	if err := verifyRPIDHash(opts.RP.ID, authData); err != nil {
-		return nil, &ErrValidateRegistration{
-			Detail: "Relying Party ID hash mismatch",
-			Err:    err,
-		}
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//10. Verify that the User Present bit of the flags in authData is set.
 	if !authData.UP {
-		return nil, &ErrValidateRegistration{Detail: "User Presennt bit not set"}
+		return nil, ErrVerifyRegistration.Wrap(errors.New("User Present bit not set"))
 	}
+
 
 	//11. If user verification is required for this registration, verify that
 	//the User Verified bit of the flags in authData is set.
 	if opts.AuthenticatorSelection != nil &&
 		opts.AuthenticatorSelection.UserVerification == VerificationRequired {
 		if !authData.UV {
-			return nil, &ErrValidateRegistration{Detail: "User Verification required but missing"}
+			return nil, ErrVerifyRegistration.Wrap(errors.New("User Verification required but missing"))
 		}
 	}
 
@@ -250,7 +232,7 @@ func FinishRegistration(
 	//general case, the meaning of "are as expected" is specific to the Relying
 	//Party and which extensions are in use.
 	if err := verifyClientExtensionsOutputs(opts, cred); err != nil {
-		return nil, &ErrValidateRegistration{Detail: "Client extension outputs verification failed"}
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//13. Determine the attestation statement format by performing a USASCII
@@ -258,10 +240,8 @@ func FinishRegistration(
 	//Attestation Statement Format Identifier values. An up-to-date list of
 	//registered WebAuthn Attestation Statement Format Identifier values is
 	//maintained in the IANA registry of the same name [WebAuthn-Registries].
-	if !attStmtFmt.Valid() {
-		return nil, &ErrValidateRegistration{
-			Detail: fmt.Sprintf("Invalid attestation statement format %s", attStmtFmt),
-		}
+	if err := attStmtFmt.Valid(); err != nil {
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//14. Verify that attStmt is a correct attestation statement, conveying a
@@ -269,11 +249,9 @@ func FinishRegistration(
 	//fmt’s verification procedure given attStmt, authData and the hash of the
 	//serialized client data computed in step 7.
 	if err := verifyAttestationStatement(attStmtFmt, attStmt, rawAuthData, clientDataHash); err != nil {
-		return nil, &ErrValidateRegistration{
-			Detail: "Attestation verification failed",
-			Err:    err,
-		}
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
+
 	return &WebAuthnCredential{}, nil
 }
 
@@ -284,9 +262,7 @@ func compareChallenge(C *CollectedClientData, opts *PublicKeyCredentialCreationO
 	}
 
 	if !bytes.Equal(rawChallenge, opts.Challenge) {
-		return &ErrValidateRegistration{
-			Detail: fmt.Sprintf("Challenge mismatch: got [% X] expected [% X]", rawChallenge, opts.Challenge),
-		}
+		return fmt.Errorf("Challenge mismatch: got [% X] expected [% X]", rawChallenge, opts.Challenge)
 	}
 	return nil
 }
@@ -297,16 +273,12 @@ func verifyTokenBinding(C *CollectedClientData, opts *PublicKeyCredentialCreatio
 		case StatusSupported:
 		case StatusPresent:
 			if C.TokenBinding.ID == "" {
-				return &ErrValidateRegistration{
-					Detail: "Token binding status present without ID",
-				}
+				return errors.New("Token binding status present without ID")
 				//TODO implement Token Binding validation when support exists in
 				//Golang standard library
 			}
 		default:
-			return &ErrValidateRegistration{
-				Detail: fmt.Sprintf("Invalid token binding status %s", C.TokenBinding.Status),
-			}
+			return fmt.Errorf("Invalid token binding status %s", C.TokenBinding.Status)
 		}
 	}
 	return nil
@@ -334,9 +306,7 @@ func decodeAuthData(raw []byte) (*AuthenticatorData, error) {
 func verifyRPIDHash(RPID string, authData *AuthenticatorData) error {
 	rpIDHash := sha256.Sum256([]byte(RPID))
 	if !bytes.Equal(rpIDHash[:], authData.RPIDHash[:]) {
-		return &ErrValidateRegistration{
-			Detail: fmt.Sprintf("RPID hash does not match authData (RPID: %s)", RPID),
-		}
+		return fmt.Errorf("RPID hash does not match authData (RPID: %s)", RPID)
 	}
 	return nil
 }
@@ -345,9 +315,7 @@ func verifyClientExtensionsOutputs(opts *PublicKeyCredentialCreationOptions, cre
 	for k, credV := range cred.Extensions {
 		optsV, ok := opts.Extensions[k]
 		if !ok {
-			return &ErrValidateRegistration{
-				Detail: fmt.Sprintf("Extension key %s provided in credential but not creation options", k),
-			}
+			return fmt.Errorf("Extension key %s provided in credential but not creation options", k)
 		}
 
 		if validator, ok := ExtensionValidators[k]; ok { //ignore if no validator
@@ -373,5 +341,5 @@ func verifyAttestationStatement(
 		return VerifyPackedAttestationStatement(attStmt, authData, clientData)
 	}
 
-	return &ErrAttestationVerification{Detail: "Unsupported attestation format"}
+	return ErrVerifyAttestation.Wrap(errors.New("Unsupported attestation format"))
 }

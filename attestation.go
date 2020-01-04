@@ -121,6 +121,14 @@ type PackedAttestationStatement struct {
 	ECDAAKeyID []byte                  `cbor:"ecdaaKeyId"`
 }
 
+func coseSigAlg(alg COSEAlgorithmIdentifier) x509.SignatureAlgorithm {
+	switch alg {
+	case AlgorithmES256:
+		return x509.ECDSAWithSHA256
+	}
+	return x509.UnknownSignatureAlgorithm
+}
+
 //VerifyPackedAttestationStatement verifies that an attestation statement of
 //type "packed" is valid
 func VerifyPackedAttestationStatement(rawAttStmt cbor.RawMessage, authData []byte, clientData [32]byte) error {
@@ -140,17 +148,25 @@ func VerifyPackedAttestationStatement(rawAttStmt cbor.RawMessage, authData []byt
 		//Verify that sig is a valid signature over the concatenation of
 		//authenticatorData and clientDataHash using the attestation public key
 		//in attestnCert with the algorithm specified in alg.
-
-		switch attStmt.Alg {
-		case AlgorithmES256:
-			pubKey, err := x509.ParsePKIXPublicKey(attStmt.X5C[0])
-			if err != nil {
-				return &ErrAttestationVerification{
-					Detail: fmt.Sprintf("Unable to parse attestation public key: %v", err),
-				}
+		signed := make([]byte, 0)
+		signed = append(signed, authData...)
+		signed = append(signed, clientData[:]...)
+		cert, err := x509.ParseCertificate(attStmt.X5C[0])
+		if err != nil {
+			return &ErrAttestationVerification{
+				Detail: fmt.Sprintf("Unable to parse attestation public key: %v", err),
 			}
-
 		}
+		err = cert.CheckSignature(coseSigAlg(attStmt.Alg), signed, attStmt.Sig)
+		if err != nil {
+			return &ErrAttestationVerification{
+				Detail: fmt.Sprintf("Unable to verify attestation signature: %v", err),
+			}
+		}
+
+		//Verify that attestnCert meets the requirements in §8.2.1 Packed
+		//Attestation Statement Certificate Requirements.
+
 	}
 
 	return nil

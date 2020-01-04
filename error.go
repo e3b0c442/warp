@@ -1,121 +1,33 @@
 package warp
 
-//DetailedError defines a function to add details to returned errors for
-//additional troubleshooting
-type DetailedError interface {
-	Details() string
+//Error represents an error in a WebAuthn relying party operation
+type Error struct {
+	Msg     string
+	Wrapped error
 }
 
-//ErrRandIO represents an error reading from a cryptographically random source
-type ErrRandIO struct {
-	Detail string
+//Error implements the error interface
+func (e Error) Error() string {
+	return e.Msg
 }
 
-func (e *ErrRandIO) Error() string {
-	return "Random I/O read error"
+//Unwrap allows for error unwrapping
+func (e Error) Unwrap() error {
+	return e.Wrapped
 }
 
-//Details returns the error details
-func (e *ErrRandIO) Details() string {
-	return e.Detail
+//Wrap returns a new error which contains the provided error wrapped with this
+//error
+func (e Error) Wrap(err error) Error {
+	n := e
+	n.Wrapped = err
+	return n
 }
 
-//ErrUnmarshalClientData represents an error unmarshaling a client data JSON
-type ErrUnmarshalClientData struct {
-	Detail string
-}
-
-func (e *ErrUnmarshalClientData) Error() string {
-	return "Client data unmarshal error"
-}
-
-//Details returns the error details
-func (e *ErrUnmarshalClientData) Details() string {
-	return e.Detail
-}
-
-//ErrValidateRegistration represents an error validating a registration attempt.
-//This error may wrap other errors.
-type ErrValidateRegistration struct {
-	Detail string
-	Err    error
-}
-
-func (e *ErrValidateRegistration) Error() string {
-	return "Registration validation error"
-}
-
-//Unwrap implements error wrapping
-func (e *ErrValidateRegistration) Unwrap() error {
-	return e.Err
-}
-
-//Details returns the error details
-func (e *ErrValidateRegistration) Details() string {
-	return e.Detail
-}
-
-//ErrBadAuthenticatorData represents an error decoding the authenticator data.
-//This error may wrap other errors
-type ErrBadAuthenticatorData struct {
-	Detail string
-	Err    error
-}
-
-func (e *ErrBadAuthenticatorData) Error() string {
-	return "Bad authenticator data"
-}
-
-//Unwrap implements error wrapping
-func (e *ErrBadAuthenticatorData) Unwrap() error {
-	return e.Err
-}
-
-//Details returns the error details
-func (e *ErrBadAuthenticatorData) Details() string {
-	return e.Detail
-}
-
-//ErrBadAttestedCredentialData represents an error decoding the attested
-//credential data
-type ErrBadAttestedCredentialData struct {
-	Detail string
-}
-
-func (e *ErrBadAttestedCredentialData) Error() string {
-	return "Bad attested credential data"
-}
-
-//Details returns the error details
-func (e *ErrBadAttestedCredentialData) Details() string {
-	return e.Detail
-}
-
-//ErrClientExtensionVerification represents an error verifying extension outputs
-type ErrClientExtensionVerification struct {
-	Detail string
-}
-
-func (e *ErrClientExtensionVerification) Error() string {
-	return "Error verifying client extension output"
-}
-
-//Details returns the error details
-func (e *ErrClientExtensionVerification) Details() string {
-	return e.Detail
-}
-
-//ErrAttestationVerification represents an error verifying at attestation
-//statement
-type ErrAttestationVerification struct {
-	Detail string
-}
-
-func (e *ErrAttestationVerification) Error() string {
-	return "Error verifying attestation verification"
-}
-
-//Details returns the error details
-func (e *ErrAttestationVerification) Details() string {
-	return e.Detail
-}
+var (
+	ErrDecodeAttestedCredentialData = Error{Msg: "Error decoding attested credential data"}
+	ErrGenerateChallenge            = Error{Msg: "Error generating challenge"}
+	ErrUnmarshalClientData          = Error{Msg: "Error unmarshaling client data"}
+	ErrVerifyAttestation            = Error{Msg: "Error verifying attestation"}
+	ErrVerifyRegistration           = Error{Msg: "Error verifying registration"}
+)
