@@ -2,7 +2,6 @@ package warp
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 
 	"github.com/fxamacker/cbor"
@@ -24,16 +23,16 @@ type AuthenticatorData struct {
 func (ad *AuthenticatorData) Decode(data io.Reader) error {
 	n, err := data.Read(ad.RPIDHash[:])
 	if err != nil {
-		return &ErrBadAuthenticatorData{Detail: fmt.Sprintf("Read hash data failed: %v", err)}
+		return ErrDecodeAuthenticatorData.Wrap(NewError("Error reanding relying party ID hash").Wrap(err))
 	}
 	if n < 32 {
-		return &ErrBadAuthenticatorData{Detail: fmt.Sprintf("Expected 32 bytes of hash data, got %d", n)}
+		return ErrDecodeAuthenticatorData.Wrap(NewError("Expected 32 bytes of hash data, got %d", n))
 	}
 
 	var flags uint8
 	err = binary.Read(data, binary.BigEndian, &flags)
 	if err != nil {
-		return &ErrBadAuthenticatorData{Detail: fmt.Sprintf("Unable to read flag byte: %v", err)}
+		return ErrDecodeAuthenticatorData.Wrap(NewError("Error reading flag byte").Wrap(err))
 	}
 
 	ad.UP = false
@@ -55,20 +54,20 @@ func (ad *AuthenticatorData) Decode(data io.Reader) error {
 
 	err = binary.Read(data, binary.BigEndian, &ad.SignCount)
 	if err != nil {
-		return &ErrBadAuthenticatorData{Detail: fmt.Sprintf("Unable to read sign count: %v", err)}
+		return ErrDecodeAuthenticatorData.Wrap(NewError("Error reading sign count").Wrap(err))
 	}
 
 	if ad.AT {
 		err = ad.AttestedCredentialData.Decode(data)
 		if err != nil {
-			return &ErrBadAuthenticatorData{Err: err}
+			return ErrDecodeAuthenticatorData.Wrap(err)
 		}
 	}
 
 	if ad.ED {
 		err = cbor.NewDecoder(data).Decode(&ad.Extensions)
 		if err != nil {
-			return &ErrBadAuthenticatorData{Detail: fmt.Sprintf("Unable to decode extensions: %v", err)}
+			return ErrDecodeAuthenticatorData.Wrap(err)
 		}
 	}
 

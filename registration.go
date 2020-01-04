@@ -51,7 +51,7 @@ func StartRegistration(
 	}
 	if n < ChallengeLength {
 		return nil, ErrGenerateChallenge.Wrap(
-			fmt.Errorf("Read %d random bytes, needed %d", n, ChallengeLength),
+			NewError("Read %d random bytes, needed %d", n, ChallengeLength),
 		)
 	}
 
@@ -154,14 +154,14 @@ func FinishRegistration(
 	C := CollectedClientData{}
 	err := json.Unmarshal(cred.Response.ClientDataJSON, &C)
 	if err != nil {
-		return nil, ErrVerifyRegistration.Wrap(ErrUnmarshalClientData.Wrap(err))
+		return nil, ErrVerifyRegistration.Wrap(NewError("Error unmarshaling client data JSON").Wrap(err))
 	}
 
 	//3. Verify that the value of C.type is webauthn.create.
 	if C.Type != "webauthn.create" {
-		return nil, ErrVerifyRegistration.Wrap(errors.New("C.type is not webauthn.create"))
+		return nil, ErrVerifyRegistration.Wrap(NewError("C.type is not webauthn.create"))
 	}
-	
+
 	//4. Verify that the value of C.challenge matches the challenge that was
 	//sent to the authenticator in the create() call.
 	if err = compareChallenge(&C, opts); err != nil {
@@ -171,7 +171,7 @@ func FinishRegistration(
 	//5. Verify that the value of C.origin matches the Relying Party's origin.
 	if !strings.EqualFold(C.Origin, rp.RelyingPartyOrigin()) {
 		return nil, ErrVerifyRegistration.Wrap(
-			fmt.Errorf("Origin mismatch: got %s expected %s", C.Origin, rp.RelyingPartyOrigin()),
+			NewError("Origin mismatch: got %s expected %s", C.Origin, rp.RelyingPartyOrigin()),
 		)
 	}
 
@@ -208,16 +208,15 @@ func FinishRegistration(
 
 	//10. Verify that the User Present bit of the flags in authData is set.
 	if !authData.UP {
-		return nil, ErrVerifyRegistration.Wrap(errors.New("User Present bit not set"))
+		return nil, ErrVerifyRegistration.Wrap(NewError("User Present bit not set"))
 	}
-
 
 	//11. If user verification is required for this registration, verify that
 	//the User Verified bit of the flags in authData is set.
 	if opts.AuthenticatorSelection != nil &&
 		opts.AuthenticatorSelection.UserVerification == VerificationRequired {
 		if !authData.UV {
-			return nil, ErrVerifyRegistration.Wrap(errors.New("User Verification required but missing"))
+			return nil, ErrVerifyRegistration.Wrap(NewError("User Verification required but missing"))
 		}
 	}
 

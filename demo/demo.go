@@ -189,9 +189,6 @@ func finishRegistration(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Unauthorized: %v", err), http.StatusUnauthorized)
 		for err != nil {
 			log.Printf("%v", err)
-			if e, ok := err.(warp.DetailedError); ok {
-				log.Printf("%s", e.Details())
-			}
 			err = errors.Unwrap(err)
 		}
 

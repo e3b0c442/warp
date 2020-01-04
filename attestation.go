@@ -4,7 +4,6 @@ import (
 	"crypto"
 	"crypto/x509"
 	"encoding/binary"
-	"fmt"
 	"io"
 
 	"github.com/fxamacker/cbor"
@@ -33,7 +32,7 @@ const (
 )
 
 //Valid determines if the Attestation Format Identifier is a valid value
-func (asf AttestationStatementFormat) Valid() bool {
+func (asf AttestationStatementFormat) Valid() error {
 	switch asf {
 	case StatementPacked:
 	case StatementTPM:
@@ -42,9 +41,9 @@ func (asf AttestationStatementFormat) Valid() bool {
 	case StatementFidoU2F:
 	case StatementNone:
 	default:
-		return false
+		return NewError("Invalid attestation statement %s", asf)
 	}
-	return true
+	return nil
 }
 
 //AttestedCredentialData is a variable-length byte array added to the
@@ -60,31 +59,31 @@ type AttestedCredentialData struct {
 func (acd *AttestedCredentialData) Decode(data io.Reader) error {
 	n, err := data.Read(acd.AAGUID[:])
 	if err != nil {
-		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Read AAGUID failed: %v", err)}
+		return ErrDecodeAttestedCredentialData.Wrap(NewError("Error reading AAGUID").Wrap(err))
 	}
 	if n < 16 {
-		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Expected 16 bytes of AAGUID data, got %d", n)}
+		return ErrDecodeAttestedCredentialData.Wrap(NewError("Expected 16 bytes of AAGUID data, got %d", n))
 	}
 
 	var credLen uint16
 	err = binary.Read(data, binary.BigEndian, &credLen)
 	if err != nil {
-		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Unable to read credential length: %v", err)}
+		return ErrDecodeAttestedCredentialData.Wrap(NewError("Error reading credential length").Wrap(err))
 	}
 
 	acd.CredentialID = make([]byte, credLen)
 	n, err = data.Read(acd.CredentialID)
 	if err != nil {
-		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Read credential ID failed: %v", err)}
+		return ErrDecodeAttestedCredentialData.Wrap(NewError("Error reading credential ID").Wrap(err))
 	}
 	if uint16(n) < credLen {
-		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Expected %d bytes of credential ID data, got %d", credLen, n)}
+		return ErrDecodeAttestedCredentialData.Wrap(NewError("Expected %d bytes of credential ID data, got %d", credLen, n))
 	}
 
 	var credPK COSEKey
 	err = cbor.NewDecoder(data).Decode(&credPK)
 	if err != nil {
-		return &ErrBadAttestedCredentialData{Detail: fmt.Sprintf("Unable to unmarshal COSE key: %v", err)}
+		return ErrDecodeAttestedCredentialData.Wrap(NewError("Error unmarshaling COSE key data").Wrap(err))
 	}
 
 	return nil
@@ -107,7 +106,7 @@ type COSEKey struct {
 //"none" is valid
 func VerifyNoneAttestationStatement(attStmt cbor.RawMessage, _ []byte, _ [32]byte) error {
 	if len(attStmt) > 0 {
-		return &ErrAttestationVerification{Detail: "Attestation format none with non-empty statement"}
+		return ErrVerifyAttestation.Wrap(NewError("Attestation format none with non-empty statement"))
 	}
 	return nil
 }
@@ -137,9 +136,7 @@ func VerifyPackedAttestationStatement(rawAttStmt cbor.RawMessage, authData []byt
 	var attStmt PackedAttestationStatement
 	err := cbor.Unmarshal(rawAttStmt, &attStmt)
 	if err != nil {
-		return &ErrAttestationVerification{
-			Detail: fmt.Sprintf("Unable to decode packed attestation statement: %v", err),
-		}
+		return ErrVerifyAttestation.Wrap(NewError("Error unmarshaling packed attestation statement").Wrap(err))
 	}
 
 	//2. If x5c is present, this indicates that the attestation type is not
@@ -153,15 +150,11 @@ func VerifyPackedAttestationStatement(rawAttStmt cbor.RawMessage, authData []byt
 		signed = append(signed, clientData[:]...)
 		cert, err := x509.ParseCertificate(attStmt.X5C[0])
 		if err != nil {
-			return &ErrAttestationVerification{
-				Detail: fmt.Sprintf("Unable to parse attestation public key: %v", err),
-			}
+			return ErrVerifyAttestation.Wrap(NewError("Error parsing attestation certificate").Wrap(err))
 		}
 		err = cert.CheckSignature(coseSigAlg(attStmt.Alg), signed, attStmt.Sig)
 		if err != nil {
-			return &ErrAttestationVerification{
-				Detail: fmt.Sprintf("Unable to verify attestation signature: %v", err),
-			}
+			return ErrVerifyAttestation.Wrap(NewError("Error checking attestation signature").Wrap(err))
 		}
 
 		//Verify that attestnCert meets the requirements in §8.2.1 Packed

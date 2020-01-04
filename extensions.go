@@ -48,7 +48,7 @@ func VerifyAppID(_, out interface{}) error {
 	if _, ok := out.(bool); ok {
 		return nil
 	}
-	return &ErrClientExtensionVerification{Detail: "Invalid AppID output value"}
+	return ErrVerifyClientExtensionOutput.Wrap(NewError("AppID output value must be bool"))
 }
 
 //EffectiveRPID returns the effective relying party ID for the ceremony based on
