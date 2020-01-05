@@ -33,10 +33,12 @@ func NewError(fmStr string, els ...interface{}) Error {
 	}
 }
 
+//Categorical top-level errors
 var (
 	ErrDecodeAttestedCredentialData = Error{err: "Error decoding attested credential data"}
 	ErrDecodeAuthenticatorData      = Error{err: "Error decoding authenticator data"}
 	ErrGenerateChallenge            = Error{err: "Error generating challenge"}
+	ErrNotImplemented               = Error{err: "Not implemented"}
 	ErrVerifyAttestation            = Error{err: "Error verifying attestation"}
 	ErrVerifyClientExtensionOutput  = Error{err: "Error verifying client extension output"}
 	ErrVerifyRegistration           = Error{err: "Error verifying registration"}

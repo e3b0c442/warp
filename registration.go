@@ -251,7 +251,38 @@ func FinishRegistration(
 		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
-	return &WebAuthnCredential{}, nil
+	//15. If validation is successful, obtain a list of acceptable trust anchors
+	//(attestation root certificates or ECDAA-Issuer public keys) for that
+	//attestation type and attestation statement format fmt, from a trusted
+	//source or from policy.
+	//TODO once other attestation formats are implemented
+
+	//16. Assess the attestation trustworthiness using the outputs of the
+	//verification procedure
+	//TODO once other attestation formats are implemented
+
+	//17. Check that the credentialId is not yet registered to any other user.
+	//If registration is requested for a credential that is already registered
+	//to a different user, the Relying Party SHOULD fail this registration
+	//ceremony, or it MAY decide to accept the registration, e.g. while deleting
+	//the older registration.
+	//TODO implement optional deletion
+	if rp.CredentialExists(authData.AttestedCredentialData.CredentialID) {
+		return nil, ErrVerifyRegistration.Wrap(NewError("Credential with this ID already exists"))
+	}
+
+	//18. If the attestation statement attStmt verified successfully and is
+	//found to be trustworthy, then register the new credential with the account
+	//that was denoted in the options.user passed to create(), by associating it
+	//with the credentialId and credentialPublicKey in the
+	//attestedCredentialData in authData, as appropriate for the Relying Party's
+	//system.
+
+	return &WebAuthnCredential{
+		ID:        authData.AttestedCredentialData.CredentialID,
+		PublicKey: authData.AttestedCredentialData.CredentialPublicKey,
+		User:      opts.User,
+	}, nil
 }
 
 func compareChallenge(C *CollectedClientData, opts *PublicKeyCredentialCreationOptions) error {
@@ -336,8 +367,6 @@ func verifyAttestationStatement(
 	switch fmt {
 	case StatementNone:
 		return VerifyNoneAttestationStatement(attStmt, authData, clientData)
-	case StatementPacked:
-		return VerifyPackedAttestationStatement(attStmt, authData, clientData)
 	}
 
 	return ErrVerifyAttestation.Wrap(errors.New("Unsupported attestation format"))

@@ -61,6 +61,9 @@ func (r rp) RelyingPartyIcon() string {
 func (r rp) RelyingPartyOrigin() string {
 	return r.origin
 }
+func (r rp) CredentialExists(id []byte) bool {
+	return false
+}
 
 type SessionData struct {
 	CreationOptions *warp.PublicKeyCredentialCreationOptions
@@ -144,7 +147,7 @@ func startRegistration(w http.ResponseWriter, r *http.Request) {
 		users[username] = u
 	}
 
-	opts, err := warp.StartRegistration(relyingParty, u, warp.Attestation(warp.ConveyanceIndirect))
+	opts, err := warp.StartRegistration(relyingParty, u, warp.Attestation(warp.ConveyanceNone))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Start register fail: %v", err), http.StatusInternalServerError)
 		return
@@ -184,7 +187,7 @@ func finishRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = warp.FinishRegistration(relyingParty, session.CreationOptions, &cred)
+	waCred, err := warp.FinishRegistration(relyingParty, session.CreationOptions, &cred)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Unauthorized: %v", err), http.StatusUnauthorized)
 		for err != nil {
@@ -195,6 +198,7 @@ func finishRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("NEW CREDENTIAL: %#v", waCred)
 	w.WriteHeader(http.StatusNoContent)
 }
 

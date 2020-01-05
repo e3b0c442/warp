@@ -1,6 +1,9 @@
 # warp - **W**eb**A**uthn **R**elying **P**arty
 _warp_ is a WebAuthn Relying Party implementation which is intended to be 100% compliant with the [W3C WebAuthn Level 1](https://https://www.w3.org/TR/webauthn-1/) standard while being HTTP implementation agnostic.
 
+To be implemented:
+* Attestation verification for all but "none" attestation statement formats
+
 ## Design goals
 _warp_ was built with the following goals in mind:
 * 100% compliance with the WebAuthn Level 1 specification

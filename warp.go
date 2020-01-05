@@ -32,7 +32,12 @@ type RelyingParty interface {
 	RelyingPartyName() string
 	RelyingPartyIcon() string
 	RelyingPartyOrigin() string
+	CredentialExists([]byte) bool
 }
 
 //WebAuthnCredential represents the elements of a credential that must be stored
-type WebAuthnCredential struct{}
+type WebAuthnCredential struct {
+	ID        []byte
+	PublicKey COSEKey
+	User      PublicKeyCredentialUserEntity
+}

@@ -73,3 +73,45 @@ func (ad *AuthenticatorData) Decode(data io.Reader) error {
 
 	return nil
 }
+
+//AttestedCredentialData is a variable-length byte array added to the
+//authenticator data when generating an attestation object for a given
+//credential. §6.4.1
+type AttestedCredentialData struct {
+	AAGUID              [16]byte
+	CredentialID        []byte
+	CredentialPublicKey COSEKey
+}
+
+//Decode decodes the attested credential data from a stream
+func (acd *AttestedCredentialData) Decode(data io.Reader) error {
+	n, err := data.Read(acd.AAGUID[:])
+	if err != nil {
+		return ErrDecodeAttestedCredentialData.Wrap(NewError("Error reading AAGUID").Wrap(err))
+	}
+	if n < 16 {
+		return ErrDecodeAttestedCredentialData.Wrap(NewError("Expected 16 bytes of AAGUID data, got %d", n))
+	}
+
+	var credLen uint16
+	err = binary.Read(data, binary.BigEndian, &credLen)
+	if err != nil {
+		return ErrDecodeAttestedCredentialData.Wrap(NewError("Error reading credential length").Wrap(err))
+	}
+
+	acd.CredentialID = make([]byte, credLen)
+	n, err = data.Read(acd.CredentialID)
+	if err != nil {
+		return ErrDecodeAttestedCredentialData.Wrap(NewError("Error reading credential ID").Wrap(err))
+	}
+	if uint16(n) < credLen {
+		return ErrDecodeAttestedCredentialData.Wrap(NewError("Expected %d bytes of credential ID data, got %d", credLen, n))
+	}
+
+	err = cbor.NewDecoder(data).Decode(&acd.CredentialPublicKey)
+	if err != nil {
+		return ErrDecodeAttestedCredentialData.Wrap(NewError("Error unmarshaling COSE key data").Wrap(err))
+	}
+
+	return nil
+}
