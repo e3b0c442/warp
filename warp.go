@@ -1,21 +1,5 @@
 package warp
 
-//SupportedAttestationStatementFormats returns the list of attestation formats
-//currently supported by the library
-func SupportedAttestationStatementFormats() []AttestationStatementFormat {
-	return []AttestationStatementFormat{
-		StatementNone,
-	}
-}
-
-//SupportedKeyAlgorithms returns the list of key algorithms currently supported
-//by the library
-func SupportedKeyAlgorithms() []COSEAlgorithmIdentifier {
-	return []COSEAlgorithmIdentifier{
-		AlgorithmES256,
-	}
-}
-
 //User defines functions which return data required about the authenticating
 //user in order to perform WebAuthn transactions.
 type User interface {
@@ -40,4 +24,24 @@ type WebAuthnCredential struct {
 	ID        []byte
 	PublicKey COSEKey
 	User      PublicKeyCredentialUserEntity
+}
+
+//ChallengeLength represents the size of the generated challenge. Must be
+//greater than 16.
+var ChallengeLength = 32
+
+//SupportedAttestationStatementFormats returns the list of attestation formats
+//currently supported by the library
+func SupportedAttestationStatementFormats() []AttestationStatementFormat {
+	return []AttestationStatementFormat{
+		StatementNone,
+	}
+}
+
+//SupportedKeyAlgorithms returns the list of key algorithms currently supported
+//by the library
+func SupportedKeyAlgorithms() []COSEAlgorithmIdentifier {
+	return []COSEAlgorithmIdentifier{
+		AlgorithmES256,
+	}
 }

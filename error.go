@@ -38,8 +38,10 @@ var (
 	ErrDecodeAttestedCredentialData = Error{err: "Error decoding attested credential data"}
 	ErrDecodeAuthenticatorData      = Error{err: "Error decoding authenticator data"}
 	ErrGenerateChallenge            = Error{err: "Error generating challenge"}
+	ErrOption                       = Error{err: "Option error"}
 	ErrNotImplemented               = Error{err: "Not implemented"}
 	ErrVerifyAttestation            = Error{err: "Error verifying attestation"}
+	ErrVerifyAuthentication         = Error{err: "Error verifying authentication"}
 	ErrVerifyClientExtensionOutput  = Error{err: "Error verifying client extension output"}
 	ErrVerifyRegistration           = Error{err: "Error verifying registration"}
 )

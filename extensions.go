@@ -17,8 +17,8 @@ type AuthenticationExtensionsClientOutputs map[string]interface{}
 //object
 type Extension func(map[string]interface{})
 
-//Extensions builds the extension map to be added to the options object
-func Extensions(exts ...Extension) AuthenticationExtensionsClientInputs {
+//BuildExtensions builds the extension map to be added to the options object
+func BuildExtensions(exts ...Extension) AuthenticationExtensionsClientInputs {
 	extensions := make(map[string]interface{})
 
 	for _, ext := range exts {

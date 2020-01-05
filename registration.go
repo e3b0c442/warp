@@ -2,7 +2,6 @@ package warp
 
 import (
 	"bytes"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -13,16 +12,12 @@ import (
 	"github.com/fxamacker/cbor"
 )
 
-//ChallengeLength represents the size of the generated challenge. Must be
-//greater than 16.
-var ChallengeLength = 32
-
 //StartRegistration starts the registration ceremony by creating a credential
 //creation options object to be sent to the client.
 func StartRegistration(
 	rp RelyingParty,
 	user User,
-	opts ...CreationOption,
+	opts ...Option,
 ) (
 	*PublicKeyCredentialCreationOptions,
 	error,
@@ -44,15 +39,9 @@ func StartRegistration(
 		DisplayName: user.UserDisplayName(),
 	}
 
-	challenge := make([]byte, ChallengeLength)
-	n, err := rand.Read(challenge)
+	challenge, err := GenerateChallenge()
 	if err != nil {
 		return nil, ErrGenerateChallenge.Wrap(err)
-	}
-	if n < ChallengeLength {
-		return nil, ErrGenerateChallenge.Wrap(
-			NewError("Read %d random bytes, needed %d", n, ChallengeLength),
-		)
 	}
 
 	credParams := SupportedPublicKeyCredentialParameters()
@@ -65,7 +54,10 @@ func StartRegistration(
 	}
 
 	for _, opt := range opts {
-		opt(&creationOptions)
+		err = opt(&creationOptions)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &creationOptions, nil
@@ -85,51 +77,6 @@ func SupportedPublicKeyCredentialParameters() []PublicKeyCredentialParameters {
 	}
 
 	return params
-}
-
-//CreationOption is a function that can be passed as a parameter to the
-//BeginRegister function which adjusts the final credential creation options
-//object.
-type CreationOption func(*PublicKeyCredentialCreationOptions)
-
-//Timeout returns a creation option that adds a custom timeout to the creation
-//options object
-func Timeout(timeout uint) CreationOption {
-	return func(co *PublicKeyCredentialCreationOptions) {
-		co.Timeout = timeout
-	}
-}
-
-//ExcludeCredentials returns a creation option that adds a list of credentials
-//to exclude to the creation options object
-func ExcludeCredentials(creds []PublicKeyCredentialDescriptor) CreationOption {
-	return func(co *PublicKeyCredentialCreationOptions) {
-		co.ExcludeCredentials = creds
-	}
-}
-
-//AuthenticatorSelection returns a creation option that adds authenticator
-//selection criteria to the creation options object
-func AuthenticatorSelection(criteria AuthenticatorSelectionCriteria) CreationOption {
-	return func(co *PublicKeyCredentialCreationOptions) {
-		co.AuthenticatorSelection = &criteria
-	}
-}
-
-//Attestation returns a creation option that adds an attestation conveyance
-//preference to the creation options object
-func Attestation(pref AttestationConveyancePreference) CreationOption {
-	return func(co *PublicKeyCredentialCreationOptions) {
-		co.Attestation = pref
-	}
-}
-
-//CreationExtensions returns a creation option that adds one or more extensions
-//to the creation options object
-func CreationExtensions(exts ...Extension) CreationOption {
-	return func(co *PublicKeyCredentialCreationOptions) {
-		co.Extensions = Extensions(exts...)
-	}
 }
 
 //FinishRegistration completes the registration ceremony by validating the
