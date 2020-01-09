@@ -10,10 +10,13 @@ type User interface {
 	Credentials() []WebAuthnCredential
 }
 
-//UserFinder defines a function which returns an object takes a user handle as
-//a parameter and returns an object which implements the User interface and an
-//error
+//UserFinder defines a function which takes a user handle as a parameter and
+//returns an object which implements the User interface and an error
 type UserFinder func([]byte) (User, error)
+
+//CredFinder defines a funciton which takes a credential ID as a parameter and
+//returns a pointer to WebAuthnCredential and an error
+type CredFinder func(string) (*WebAuthnCredential, error)
 
 //RelyingParty defines functions which return data required about the Relying
 //Party in order to perform WebAuthn transactions.

@@ -33,6 +33,7 @@ func StartAuthentication(
 //provided credential assertion against the stored public key.
 func FinishAuthentication(
 	userFinder UserFinder,
+	credFinder CredFinder,
 	opts *PublicKeyCredentialRequestOptions,
 	cred *AssertionPublicKeyCredential,
 ) error {
@@ -53,6 +54,46 @@ func FinishAuthentication(
 	//initiated, verify that credential.response.userHandle is present, and that
 	//the user identified by this value is the owner of credentialSource.
 	if err := checkUserOwnsCredential(userFinder, cred); err != nil {
+		return ErrVerifyAuthentication.Wrap(err)
+	}
+
+	//3. Using credential’s id attribute (or the corresponding rawId, if
+	//base64url encoding is inappropriate for your use case), look up the
+	//corresponding credential public key.
+	storedCred, err := credFinder(cred.ID)
+	if err != nil {
+		return ErrVerifyAuthentication.Wrap(
+			NewError("Unable to retrieve credential").Wrap(err),
+		)
+	}
+
+	//4. Let cData, authData and sig denote the value of credential’s response's
+	//clientDataJSON, authenticatorData, and signature respectively.
+	cData := cred.Response.ClientDataJSON
+	authData := cred.Response.AuthenticatorData
+	sig := cred.Response.Signature
+
+	//5. Let JSONtext be the result of running UTF-8 decode on the value of
+	//cData.
+	//TODO research if there are any instances where the byte stream is not
+	//valid JSON per the JSON decoder
+
+	//6. Let C, the client data claimed as used for the signature, be the result
+	//of running an implementation-specific JSON parser on JSONtext.
+	C, err := ParseClientData(cData)
+	if err != nil {
+		return ErrVerifyAuthentication.Wrap(err)
+	}
+
+	//7. Verify that the value of C.type is the string webauthn.get.
+	if C.Type != "webauthn.get" {
+		return ErrVerifyAuthentication.Wrap(NewError("C.type is not webauthn.get"))
+	}
+
+	//8. Verify that the value of C.challenge matches the challenge that was
+	//sent to the authenticator in the PublicKeyCredentialRequestOptions passed
+	//to the get() call.
+	if err = CompareChallenge(C, opts.Challenge); err != nil {
 		return ErrVerifyAuthentication.Wrap(err)
 	}
 

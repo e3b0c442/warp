@@ -3,8 +3,6 @@ package warp
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -98,10 +96,9 @@ func FinishRegistration(
 	//2. Let C, the client data claimed as collected during the credential
 	//creation, be the result of running an implementation-specific JSON parser
 	//on JSONtext.
-	C := CollectedClientData{}
-	err := json.Unmarshal(cred.Response.ClientDataJSON, &C)
+	C, err := ParseClientData(cred.Response.ClientDataJSON)
 	if err != nil {
-		return nil, ErrVerifyRegistration.Wrap(NewError("Error unmarshaling client data JSON").Wrap(err))
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//3. Verify that the value of C.type is webauthn.create.
@@ -111,7 +108,7 @@ func FinishRegistration(
 
 	//4. Verify that the value of C.challenge matches the challenge that was
 	//sent to the authenticator in the create() call.
-	if err = compareChallenge(&C, opts); err != nil {
+	if err = CompareChallenge(C, opts.Challenge); err != nil {
 		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
@@ -127,7 +124,7 @@ func FinishRegistration(
 	//obtained. If Token Binding was used on that TLS connection, also verify
 	//that C.tokenBinding.id matches the base64url encoding of the Token Binding
 	//ID for the connection.
-	if err = verifyTokenBinding(&C, opts); err != nil {
+	if err = verifyTokenBinding(C, opts); err != nil {
 		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
@@ -230,18 +227,6 @@ func FinishRegistration(
 		PublicKey: authData.AttestedCredentialData.CredentialPublicKey,
 		User:      opts.User,
 	}, nil
-}
-
-func compareChallenge(C *CollectedClientData, opts *PublicKeyCredentialCreationOptions) error {
-	rawChallenge, err := base64.RawURLEncoding.DecodeString(C.Challenge)
-	if err != nil {
-		return err
-	}
-
-	if !bytes.Equal(rawChallenge, opts.Challenge) {
-		return fmt.Errorf("Challenge mismatch: got [% X] expected [% X]", rawChallenge, opts.Challenge)
-	}
-	return nil
 }
 
 func verifyTokenBinding(C *CollectedClientData, opts *PublicKeyCredentialCreationOptions) error {
