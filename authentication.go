@@ -32,7 +32,7 @@ func StartAuthentication(
 //FinishAuthentication completes the authentication ceremony by validating the
 //provided credential assertion against the stored public key.
 func FinishAuthentication(
-	user *User,
+	userFinder UserFinder,
 	opts *PublicKeyCredentialRequestOptions,
 	cred *AssertionPublicKeyCredential,
 ) error {
@@ -52,7 +52,11 @@ func FinishAuthentication(
 	//the user was not identified before the authentication ceremony was
 	//initiated, verify that credential.response.userHandle is present, and that
 	//the user identified by this value is the owner of credentialSource.
+	if err := checkUserOwnsCredential(userFinder, cred); err != nil {
+		return ErrVerifyAuthentication.Wrap(err)
+	}
 
+	return nil
 }
 
 func checkAllowedCredentials(allowed []PublicKeyCredentialDescriptor, id []byte) error {
@@ -65,4 +69,22 @@ func checkAllowedCredentials(allowed []PublicKeyCredentialDescriptor, id []byte)
 		}
 	}
 	return NewError("Credential ID not found in allowed list")
+}
+
+func checkUserOwnsCredential(userFinder UserFinder, cred *AssertionPublicKeyCredential) error {
+	user, err := userFinder(cred.Response.UserHandle)
+	if err != nil {
+		return ErrVerifyAuthentication.Wrap(err)
+	}
+
+	userCreds := user.Credentials()
+	err = NewError("User %s does not own this credential", user.Name())
+	for _, userCred := range userCreds {
+		if bytes.Equal(cred.RawID, userCred.ID) {
+			err = nil
+			break
+		}
+	}
+
+	return err
 }

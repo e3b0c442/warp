@@ -24,19 +24,19 @@ func StartRegistration(
 ) {
 	rpEntity := PublicKeyCredentialRPEntity{
 		PublicKeyCredentialEntity: PublicKeyCredentialEntity{
-			Name: rp.RelyingPartyName(),
-			Icon: rp.RelyingPartyIcon(),
+			Name: rp.Name(),
+			Icon: rp.Icon(),
 		},
-		ID: rp.RelyingPartyID(),
+		ID: rp.ID(),
 	}
 
 	userEntity := PublicKeyCredentialUserEntity{
 		PublicKeyCredentialEntity: PublicKeyCredentialEntity{
-			Name: user.UserName(),
-			Icon: user.UserIcon(),
+			Name: user.Name(),
+			Icon: user.Icon(),
 		},
-		ID:          user.UserID(),
-		DisplayName: user.UserDisplayName(),
+		ID:          user.ID(),
+		DisplayName: user.DisplayName(),
 	}
 
 	challenge, err := GenerateChallenge()
@@ -116,9 +116,9 @@ func FinishRegistration(
 	}
 
 	//5. Verify that the value of C.origin matches the Relying Party's origin.
-	if !strings.EqualFold(C.Origin, rp.RelyingPartyOrigin()) {
+	if !strings.EqualFold(C.Origin, rp.Origin()) {
 		return nil, ErrVerifyRegistration.Wrap(
-			NewError("Origin mismatch: got %s expected %s", C.Origin, rp.RelyingPartyOrigin()),
+			NewError("Origin mismatch: got %s expected %s", C.Origin, rp.Origin()),
 		)
 	}
 
