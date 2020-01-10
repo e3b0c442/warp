@@ -1,6 +1,9 @@
 package warp
 
-import "bytes"
+import (
+	"bytes"
+	"crypto/sha256"
+)
 
 //StartAuthentication starts the authentication ceremony by creating a
 //credential request options object to be sent to the client
@@ -10,7 +13,7 @@ func StartAuthentication(
 	*PublicKeyCredentialRequestOptions,
 	error,
 ) {
-	challenge, err := GenerateChallenge()
+	challenge, err := generateChallenge()
 	if err != nil {
 		return nil, ErrGenerateChallenge.Wrap(err)
 	}
@@ -32,8 +35,8 @@ func StartAuthentication(
 //FinishAuthentication completes the authentication ceremony by validating the
 //provided credential assertion against the stored public key.
 func FinishAuthentication(
+	rp RelyingParty,
 	userFinder UserFinder,
-	credFinder CredFinder,
 	opts *PublicKeyCredentialRequestOptions,
 	cred *AssertionPublicKeyCredential,
 ) error {
@@ -53,25 +56,22 @@ func FinishAuthentication(
 	//the user was not identified before the authentication ceremony was
 	//initiated, verify that credential.response.userHandle is present, and that
 	//the user identified by this value is the owner of credentialSource.
-	if err := checkUserOwnsCredential(userFinder, cred); err != nil {
-		return ErrVerifyAuthentication.Wrap(err)
-	}
+	//Combined with step 3
 
 	//3. Using credential’s id attribute (or the corresponding rawId, if
 	//base64url encoding is inappropriate for your use case), look up the
 	//corresponding credential public key.
-	storedCred, err := credFinder(cred.ID)
-	if err != nil {
-		return ErrVerifyAuthentication.Wrap(
-			NewError("Unable to retrieve credential").Wrap(err),
-		)
-	}
+	storedCred, err := getUserVerifiedCredential(userFinder, cred)
 
 	//4. Let cData, authData and sig denote the value of credential’s response's
 	//clientDataJSON, authenticatorData, and signature respectively.
 	cData := cred.Response.ClientDataJSON
-	authData := cred.Response.AuthenticatorData
+	rawAuthData := cred.Response.AuthenticatorData
 	sig := cred.Response.Signature
+	authData, err := decodeAuthData(rawAuthData)
+	if err != nil {
+		return ErrVerifyAuthentication.Wrap(err)
+	}
 
 	//5. Let JSONtext be the result of running UTF-8 decode on the value of
 	//cData.
@@ -80,7 +80,7 @@ func FinishAuthentication(
 
 	//6. Let C, the client data claimed as used for the signature, be the result
 	//of running an implementation-specific JSON parser on JSONtext.
-	C, err := ParseClientData(cData)
+	C, err := parseClientData(cData)
 	if err != nil {
 		return ErrVerifyAuthentication.Wrap(err)
 	}
@@ -93,9 +93,66 @@ func FinishAuthentication(
 	//8. Verify that the value of C.challenge matches the challenge that was
 	//sent to the authenticator in the PublicKeyCredentialRequestOptions passed
 	//to the get() call.
-	if err = CompareChallenge(C, opts.Challenge); err != nil {
+	if err = verifyChallenge(C, opts.Challenge); err != nil {
 		return ErrVerifyAuthentication.Wrap(err)
 	}
+
+	//9. Verify that the value of C.origin matches the Relying Party's origin.
+	if err = verifyOrigin(C, rp); err != nil {
+		return ErrVerifyAuthentication.Wrap(err)
+	}
+
+	//10. Verify that the value of C.tokenBinding.status matches the state of
+	//Token Binding for the TLS connection over which the attestation was
+	//obtained. If Token Binding was used on that TLS connection, also verify
+	//that C.tokenBinding.id matches the base64url encoding of the Token Binding
+	//ID for the connection.
+	if err = verifyTokenBinding(C); err != nil {
+		return ErrVerifyAuthentication.Wrap(err)
+	}
+
+	//11. Verify that the rpIdHash in authData is the SHA-256 hash of the RP ID
+	//expected by the Relying Party.
+	if err = verifyRPIDHash(opts.RPID, authData); err != nil {
+		return ErrVerifyAuthentication.Wrap(err)
+	}
+
+	//12. Verify that the User Present bit of the flags in authData is set.
+	if err = verifyUserPresent(authData); err != nil {
+		return ErrVerifyAuthentication.Wrap(err)
+	}
+
+	//13. If user verification is required for this assertion, verify that the
+	//User Verified bit of the flags in authData is set.
+	if opts.UserVerification == VerificationRequired {
+		if err = verifyUserVerified(authData); err != nil {
+			return ErrVerifyAuthentication.Wrap(err)
+		}
+	}
+
+	//14. Verify that the values of the client extension outputs in
+	//clientExtensionResults and the authenticator extension outputs in the
+	//extensions in authData are as expected, considering the client extension
+	//input values that were given as the extensions option in the get() call.
+	//In particular, any extension identifier values in the
+	//clientExtensionResults and the extensions in authData MUST be also be
+	//present as extension identifier values in the extensions member of
+	//options, i.e., no extensions are present that were not requested. In the
+	//general case, the meaning of "are as expected" is specific to the Relying
+	//Party and which extensions are in use.
+	if err := verifyClientExtensionsOutputs(opts.Extensions, cred.Extensions); err != nil {
+		return ErrVerifyAuthentication.Wrap(err)
+	}
+
+	//15. Let hash be the result of computing a hash over the cData using
+	//SHA-256.
+	hash := sha256.Sum256(cData)
+
+	//16. Using the credential public key looked up in step 3, verify that sig
+	//is a valid signature over the binary concatenation of authData and hash.
+	bincat := make([]byte, 0, sha256.Size+len(rawAuthData))
+	bincat = append(bincat, hash[:]...)
+	bincat = append(bincat, rawAuthData...)
 
 	return nil
 }
@@ -112,20 +169,15 @@ func checkAllowedCredentials(allowed []PublicKeyCredentialDescriptor, id []byte)
 	return NewError("Credential ID not found in allowed list")
 }
 
-func checkUserOwnsCredential(userFinder UserFinder, cred *AssertionPublicKeyCredential) error {
+func getUserVerifiedCredential(userFinder UserFinder, cred *AssertionPublicKeyCredential) (Cred, error) {
 	user, err := userFinder(cred.Response.UserHandle)
 	if err != nil {
-		return ErrVerifyAuthentication.Wrap(err)
+		return nil, ErrVerifyAuthentication.Wrap(err)
 	}
 
-	userCreds := user.Credentials()
-	err = NewError("User %s does not own this credential", user.Name())
-	for _, userCred := range userCreds {
-		if bytes.Equal(cred.RawID, userCred.ID) {
-			err = nil
-			break
-		}
+	storedCred, ok := user.Credentials()[cred.ID]
+	if !ok {
+		return nil, NewError("User %s does not own this credential", user.Name())
 	}
-
-	return err
+	return storedCred, nil
 }

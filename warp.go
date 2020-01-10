@@ -1,5 +1,7 @@
 package warp
 
+import "github.com/fxamacker/cbor"
+
 //User defines functions which return data required about the authenticating
 //user in order to perform WebAuthn transactions.
 type User interface {
@@ -7,16 +9,24 @@ type User interface {
 	Icon() string
 	ID() []byte
 	DisplayName() string
-	Credentials() []WebAuthnCredential
+	Credentials() map[string]Cred
 }
 
 //UserFinder defines a function which takes a user handle as a parameter and
 //returns an object which implements the User interface and an error
 type UserFinder func([]byte) (User, error)
 
+//Cred defines functions which return data required about the stored
+//credentials
+type Cred interface {
+	User() User
+	ID() string
+	RawKey() cbor.RawMessage
+}
+
 //CredFinder defines a funciton which takes a credential ID as a parameter and
 //returns a pointer to WebAuthnCredential and an error
-type CredFinder func(string) (*WebAuthnCredential, error)
+type CredFinder func(string) (Cred, error)
 
 //RelyingParty defines functions which return data required about the Relying
 //Party in order to perform WebAuthn transactions.
@@ -26,13 +36,6 @@ type RelyingParty interface {
 	Icon() string
 	Origin() string
 	CredentialExists([]byte) bool
-}
-
-//WebAuthnCredential represents the elements of a credential that must be stored
-type WebAuthnCredential struct {
-	ID        []byte
-	PublicKey COSEKey
-	User      PublicKeyCredentialUserEntity
 }
 
 //ChallengeLength represents the size of the generated challenge. Must be
