@@ -217,9 +217,14 @@ func FinishRegistration(
 	//with the credentialId and credentialPublicKey in the
 	//attestedCredentialData in authData, as appropriate for the Relying Party's
 	//system.
+	rawKey, err := cbor.Marshal(authData.AttestedCredentialData.CredentialPublicKey, cbor.EncOptions{
+		Sort: cbor.SortCTAP2,
+	})
+	if err != nil {
+		return "", nil, ErrVerifyRegistration.Wrap(NewError("Unable to marshal raw key"))
+	}
 
-	return cred.ID, authData.AttestedCredentialData.CredentialPublicKey, nil
-
+	return cred.ID, rawKey, nil
 }
 
 func decodeAttestationObject(cred *AttestationPublicKeyCredential) ([]byte, AttestationStatementFormat, cbor.RawMessage, error) {

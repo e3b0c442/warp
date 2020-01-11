@@ -96,6 +96,7 @@ func verifyUserVerified(authData *AuthenticatorData) error {
 	if !authData.UV {
 		return NewError("User Verification required but missing")
 	}
+	return nil
 }
 
 func verifyClientExtensionsOutputs(ins AuthenticationExtensionsClientInputs, outs AuthenticationExtensionsClientOutputs) error {
