@@ -1,8 +1,8 @@
 package warp
 
-//Credential is the basic Credential Management Credential type that
+//CMCredential is the basic Credential Management Credential type that
 //is inherited by PublicKeyCredential
-type Credential struct {
+type CMCredential struct {
 	ID   string `json:"id"`
 	Type string `json:"type"`
 }
@@ -11,7 +11,7 @@ type Credential struct {
 //are returned to the caller when a new credential is created, or a new
 //assertion is requested.
 type PublicKeyCredential struct {
-	Credential
+	CMCredential
 	RawID      []byte                                `json:"rawId"`
 	Extensions AuthenticationExtensionsClientOutputs `json:"extensions,omitempty"`
 }

@@ -2,6 +2,7 @@ package warp
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 
 	"github.com/fxamacker/cbor"
@@ -207,7 +208,7 @@ func FinishRegistration(
 	//ceremony, or it MAY decide to accept the registration, e.g. while deleting
 	//the older registration.
 	//TODO implement optional deletion
-	if rp.CredentialExists(authData.AttestedCredentialData.CredentialID) {
+	if rp.CredentialExists(base64.RawURLEncoding.EncodeToString(authData.AttestedCredentialData.CredentialID)) {
 		return "", nil, ErrVerifyRegistration.Wrap(NewError("Credential with this ID already exists"))
 	}
 

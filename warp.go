@@ -1,7 +1,5 @@
 package warp
 
-import "github.com/fxamacker/cbor"
-
 //User defines functions which return data required about the authenticating
 //user in order to perform WebAuthn transactions.
 type User interface {
@@ -9,24 +7,25 @@ type User interface {
 	Icon() string
 	ID() []byte
 	DisplayName() string
-	Credentials() map[string]Cred
+	Credentials() map[string]Credential
 }
 
 //UserFinder defines a function which takes a user handle as a parameter and
 //returns an object which implements the User interface and an error
 type UserFinder func([]byte) (User, error)
 
-//Cred defines functions which return data required about the stored
+//Credential defines functions which return data required about the stored
 //credentials
-type Cred interface {
+type Credential interface {
 	User() User
 	ID() string
-	RawKey() cbor.RawMessage
+	PublicKey() []byte
+	SignCount() uint
 }
 
-//CredFinder defines a funciton which takes a credential ID as a parameter and
-//returns a pointer to WebAuthnCredential and an error
-type CredFinder func(string) (Cred, error)
+//CredentialFinder defines a funciton which takes a credential ID as a parameter
+//and returns an object which implements the Credential interface and an error
+type CredentialFinder func(string) (Credential, error)
 
 //RelyingParty defines functions which return data required about the Relying
 //Party in order to perform WebAuthn transactions.
@@ -35,7 +34,7 @@ type RelyingParty interface {
 	Name() string
 	Icon() string
 	Origin() string
-	CredentialExists([]byte) bool
+	CredentialExists(string) bool
 }
 
 //ChallengeLength represents the size of the generated challenge. Must be
@@ -54,6 +53,16 @@ func SupportedAttestationStatementFormats() []AttestationStatementFormat {
 //by the library
 func SupportedKeyAlgorithms() []COSEAlgorithmIdentifier {
 	return []COSEAlgorithmIdentifier{
+		AlgorithmEdDSA,
+		AlgorithmES512,
+		AlgorithmES384,
 		AlgorithmES256,
+		AlgorithmPS512,
+		AlgorithmPS384,
+		AlgorithmPS256,
+		AlgorithmRS512,
+		AlgorithmRS384,
+		AlgorithmRS256,
+		AlgorithmRS1,
 	}
 }
