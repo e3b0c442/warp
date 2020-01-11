@@ -34,7 +34,7 @@ func StartRegistration(
 		DisplayName: user.DisplayName(),
 	}
 
-	challenge, err := GenerateChallenge()
+	challenge, err := generateChallenge()
 	if err != nil {
 		return nil, ErrGenerateChallenge.Wrap(err)
 	}
@@ -180,7 +180,7 @@ func FinishRegistration(
 	//registered WebAuthn Attestation Statement Format Identifier values is
 	//maintained in the IANA registry of the same name [WebAuthn-Registries].
 	if err := attStmtFmt.Valid(); err != nil {
-		return nil, ErrVerifyRegistration.Wrap(err)
+		return "", nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//14. Verify that attStmt is a correct attestation statement, conveying a
@@ -188,7 +188,7 @@ func FinishRegistration(
 	//fmt’s verification procedure given attStmt, authData and the hash of the
 	//serialized client data computed in step 7.
 	if err := verifyAttestationStatement(attStmtFmt, attStmt, rawAuthData, clientDataHash); err != nil {
-		return nil, ErrVerifyRegistration.Wrap(err)
+		return "", nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//15. If validation is successful, obtain a list of acceptable trust anchors
@@ -208,7 +208,7 @@ func FinishRegistration(
 	//the older registration.
 	//TODO implement optional deletion
 	if rp.CredentialExists(authData.AttestedCredentialData.CredentialID) {
-		return nil, ErrVerifyRegistration.Wrap(NewError("Credential with this ID already exists"))
+		return "", nil, ErrVerifyRegistration.Wrap(NewError("Credential with this ID already exists"))
 	}
 
 	//18. If the attestation statement attStmt verified successfully and is
@@ -218,11 +218,8 @@ func FinishRegistration(
 	//attestedCredentialData in authData, as appropriate for the Relying Party's
 	//system.
 
-	return &WebAuthnCredential{
-		ID:        authData.AttestedCredentialData.CredentialID,
-		PublicKey: authData.AttestedCredentialData.CredentialPublicKey,
-		User:      opts.User,
-	}, nil
+	return cred.ID, authData.AttestedCredentialData.CredentialPublicKey, nil
+
 }
 
 func decodeAttestationObject(cred *AttestationPublicKeyCredential) ([]byte, AttestationStatementFormat, cbor.RawMessage, error) {

@@ -37,6 +37,7 @@ func NewError(fmStr string, els ...interface{}) Error {
 var (
 	ErrDecodeAttestedCredentialData = Error{err: "Error decoding attested credential data"}
 	ErrDecodeAuthenticatorData      = Error{err: "Error decoding authenticator data"}
+	ErrDecodeCOSEKey                = Error{err: "Error decoding raw public key"}
 	ErrGenerateChallenge            = Error{err: "Error generating challenge"}
 	ErrOption                       = Error{err: "Option error"}
 	ErrNotImplemented               = Error{err: "Not implemented"}
@@ -44,4 +45,5 @@ var (
 	ErrVerifyAuthentication         = Error{err: "Error verifying authentication"}
 	ErrVerifyClientExtensionOutput  = Error{err: "Error verifying client extension output"}
 	ErrVerifyRegistration           = Error{err: "Error verifying registration"}
+	ErrVerifySignature              = Error{err: "Error verifying signature"}
 )

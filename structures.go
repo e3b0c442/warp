@@ -55,14 +55,6 @@ const (
 	TransportInternal AuthenticatorTransport = "internal"
 )
 
-//COSEAlgorithmIdentifier is a number identifying a cryptographic algorithm
-type COSEAlgorithmIdentifier int
-
-//enum values for COSEAlgorithmIdentifier type
-const (
-	AlgorithmES256 COSEAlgorithmIdentifier = -7
-)
-
 //UserVerificationRequirement describes relying party user verification
 //requirements
 type UserVerificationRequirement string

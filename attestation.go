@@ -48,19 +48,6 @@ func (asf AttestationStatementFormat) Valid() error {
 	return nil
 }
 
-//COSEKey represents a key decoded from COSE format.
-type COSEKey struct {
-	Kty       int             `cbor:"1,keyasint,omitempty"`
-	Kid       []byte          `cbor:"2,keyasint,omitempty"`
-	Alg       int             `cbor:"3,keyasint,omitempty"`
-	KeyOpts   int             `cbor:"4,keyasint,omitempty"`
-	IV        []byte          `cbor:"5,keyasint,omitempty"`
-	CrvOrNOrK cbor.RawMessage `cbor:"-1,keyasint,omitempty"` // K for symmetric keys, Crv for elliptic curve keys, N for RSA modulus
-	XOrE      cbor.RawMessage `cbor:"-2,keyasint,omitempty"` // X for curve x-coordinate, E for RSA public exponent
-	Y         cbor.RawMessage `cbor:"-3,keyasint,omitempty"` // Y for curve y-cooridate
-	D         []byte          `cbor:"-4,keyasint,omitempty"`
-}
-
 //VerifyNoneAttestationStatement verifies that at attestation statement of type
 //"none" is valid
 func VerifyNoneAttestationStatement(attStmt cbor.RawMessage, _ []byte, _ [32]byte) error {

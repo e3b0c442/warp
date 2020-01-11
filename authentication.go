@@ -153,6 +153,9 @@ func FinishAuthentication(
 	bincat := make([]byte, 0, sha256.Size+len(rawAuthData))
 	bincat = append(bincat, hash[:]...)
 	bincat = append(bincat, rawAuthData...)
+	if err := VerifySignature(storedCred.RawKey(), bincat, sig); err != nil {
+		return ErrVerifyAuthentication.Wrap(err)
+	}
 
 	return nil
 }
