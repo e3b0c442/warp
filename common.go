@@ -7,12 +7,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 )
 
+var randReader io.Reader = rand.Reader
+
 func generateChallenge() ([]byte, error) {
 	challenge := make([]byte, ChallengeLength)
-	n, err := rand.Read(challenge)
+	n, err := randReader.Read(challenge)
 	if err != nil {
 		return nil, err
 	}
