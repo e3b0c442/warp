@@ -7,8 +7,6 @@ import (
 	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/sha512"
 	"encoding/asn1"
 	"encoding/binary"
 	"math/big"
@@ -79,33 +77,14 @@ func VerifySignature(rawKey cbor.RawMessage, message, sig []byte) error {
 		if !ok {
 			return ErrVerifySignature.Wrap(NewError("Invalid public key type for ECDSA algorithm"))
 		}
-
-		type ECDSASignature struct {
-			R, S *big.Int
-		}
-
-		ecdsaSig := ECDSASignature{}
-		_, err := asn1.Unmarshal(sig, &ecdsaSig)
-		if err != nil {
-			return ErrVerifySignature.Wrap(NewError("Unable to parse ECDSA signature").Wrap(err))
-		}
-
-		var msgHash []byte
 		switch COSEAlgorithmIdentifier(coseKey.Alg) {
 		case AlgorithmES256:
-			h := sha256.Sum256(message)
-			msgHash = h[:]
+			return verifyECDSASignature(pk, crypto.SHA256, message, sig)
 		case AlgorithmES384:
-			h := sha512.Sum384(message)
-			msgHash = h[:]
+			return verifyECDSASignature(pk, crypto.SHA384, message, sig)
 		case AlgorithmES512:
-			h := sha512.Sum512(message)
-			msgHash = h[:]
+			return verifyECDSASignature(pk, crypto.SHA512, message, sig)
 		}
-		if ecdsa.Verify(pk, msgHash, ecdsaSig.R, ecdsaSig.S) {
-			return nil
-		}
-		return NewError("ECDSA signature verification failed")
 
 	case AlgorithmRS1,
 		AlgorithmRS512,
@@ -119,28 +98,21 @@ func VerifySignature(rawKey cbor.RawMessage, message, sig []byte) error {
 			return ErrVerifySignature.Wrap(NewError("Invalid public key type for RSA algorithm"))
 		}
 
-		var c crypto.Hash
 		switch COSEAlgorithmIdentifier(coseKey.Alg) {
-		case AlgorithmRS512, AlgorithmPS512:
-			c = crypto.SHA512
-		case AlgorithmRS384, AlgorithmPS384:
-			c = crypto.SHA384
-		case AlgorithmRS256, AlgorithmPS256:
-			c = crypto.SHA256
-		}
-
-		h := c.New()
-		h.Write(message)
-
-		switch COSEAlgorithmIdentifier(coseKey.Alg) {
-		case AlgorithmRS512, AlgorithmRS384, AlgorithmRS256, AlgorithmRS1:
-			err = rsa.VerifyPKCS1v15(pk, c, h.Sum(nil), sig)
-		case AlgorithmPS512, AlgorithmPS384, AlgorithmPS256:
-			err = rsa.VerifyPSS(pk, c, h.Sum(nil), sig, nil)
-		}
-
-		if err != nil {
-			return ErrVerifySignature.Wrap(NewError("RSA signature verification failed"))
+		case AlgorithmRS1:
+			return verifyRSAPKCS1v15Signature(pk, crypto.SHA1, message, sig)
+		case AlgorithmRS256:
+			return verifyRSAPKCS1v15Signature(pk, crypto.SHA256, message, sig)
+		case AlgorithmRS384:
+			return verifyRSAPKCS1v15Signature(pk, crypto.SHA384, message, sig)
+		case AlgorithmRS512:
+			return verifyRSAPKCS1v15Signature(pk, crypto.SHA512, message, sig)
+		case AlgorithmPS256:
+			return verifyRSAPSSSignature(pk, crypto.SHA256, message, sig)
+		case AlgorithmPS384:
+			return verifyRSAPSSSignature(pk, crypto.SHA384, message, sig)
+		case AlgorithmPS512:
+			return verifyRSAPSSSignature(pk, crypto.SHA512, message, sig)
 		}
 
 	case AlgorithmEdDSA:
@@ -220,7 +192,7 @@ func decodeECDSAPublicKey(coseKey *COSEKey) (*ecdsa.PublicKey, error) {
 		return nil, NewError("Error decoding elliptic Y parameter").Wrap(err)
 	}
 
-	var x, y *big.Int
+	x, y := big.NewInt(0), big.NewInt(0)
 	x = x.SetBytes(xBytes)
 	y = y.SetBytes(yBytes)
 
@@ -229,6 +201,26 @@ func decodeECDSAPublicKey(coseKey *COSEKey) (*ecdsa.PublicKey, error) {
 		X:     x,
 		Y:     y,
 	}, nil
+}
+
+func verifyECDSASignature(pubKey *ecdsa.PublicKey, hash crypto.Hash, message, sig []byte) error {
+	type ECDSASignature struct {
+		R, S *big.Int
+	}
+
+	ecdsaSig := ECDSASignature{}
+	_, err := asn1.Unmarshal(sig, &ecdsaSig)
+	if err != nil {
+		return ErrVerifySignature.Wrap(NewError("Unable to parse ECDSA signature").Wrap(err))
+	}
+
+	hasher := hash.New()
+	hasher.Write(message)
+
+	if ecdsa.Verify(pubKey, hasher.Sum(nil), ecdsaSig.R, ecdsaSig.S) {
+		return nil
+	}
+	return ErrVerifySignature.Wrap(NewError("ECDSA signature verification failed"))
 }
 
 func decodeRSAPublicKey(coseKey *COSEKey) (*rsa.PublicKey, error) {
@@ -251,6 +243,28 @@ func decodeRSAPublicKey(coseKey *COSEKey) (*rsa.PublicKey, error) {
 		N: n,
 		E: e,
 	}, nil
+}
+
+func verifyRSAPKCS1v15Signature(pubKey *rsa.PublicKey, hash crypto.Hash, message, sig []byte) error {
+	hasher := hash.New()
+	hasher.Write(message)
+
+	err := rsa.VerifyPKCS1v15(pubKey, hash, hasher.Sum(nil), sig)
+	if err != nil {
+		return ErrVerifySignature.Wrap(NewError("RSA signature verification failed").Wrap(err))
+	}
+	return nil
+}
+
+func verifyRSAPSSSignature(pubKey *rsa.PublicKey, hash crypto.Hash, message, sig []byte) error {
+	hasher := hash.New()
+	hasher.Write(message)
+
+	err := rsa.VerifyPSS(pubKey, hash, hasher.Sum(nil), sig, nil)
+	if err != nil {
+		return ErrVerifySignature.Wrap(NewError("RSA signature verification failed").Wrap(err))
+	}
+	return nil
 }
 
 func decodeEd25519PublicKey(coseKey *COSEKey) (ed25519.PublicKey, error) {
