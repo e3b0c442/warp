@@ -104,9 +104,8 @@ func VerifySignature(rawKey cbor.RawMessage, message, sig []byte) error {
 		}
 		if ecdsa.Verify(pk, msgHash, ecdsaSig.R, ecdsaSig.S) {
 			return nil
-		} else {
-			return NewError("ECDSA signature verification failed")
 		}
+		return NewError("ECDSA signature verification failed")
 
 	case AlgorithmRS1,
 		AlgorithmRS512,
@@ -142,7 +141,6 @@ func VerifySignature(rawKey cbor.RawMessage, message, sig []byte) error {
 
 		if err != nil {
 			return ErrVerifySignature.Wrap(NewError("RSA signature verification failed"))
-
 		}
 
 	case AlgorithmEdDSA:
@@ -152,11 +150,11 @@ func VerifySignature(rawKey cbor.RawMessage, message, sig []byte) error {
 		}
 		if ed25519.Verify(pk, message, sig) {
 			return nil
-		} else {
-			return ErrVerifySignature.Wrap(NewError("EdDSA signature verification failed"))
 		}
+		return ErrVerifySignature.Wrap(NewError("EdDSA signature verification failed"))
+
 	}
-	return ErrVerifySignature.Wrap(NewError("COSE algorithm ID %d not supported"))
+	return ErrVerifySignature.Wrap(NewError("COSE algorithm ID %d not supported", coseKey.Alg))
 }
 
 //DecodePublicKey parses a crypto.PublicKey from a COSEKey
