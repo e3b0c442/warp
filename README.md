@@ -158,3 +158,8 @@ func FinishRegistration(rp RelyingParty, opts *PublicKeyCredentialCreationOption
 
 ### Authentication
 ![Authentication flow](https://www.w3.org/TR/webauthn-1/images/webauthn-authentication-flow-01.svg)
+
+# License
+Copyright (c) 2020 Nick Meyer.
+
+This project is released under the [MIT license](https://github.com/e3b0c442/warp/blob/master/LICENSE)
