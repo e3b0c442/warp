@@ -26,6 +26,11 @@ func (e Error) Wrap(err error) Error {
 	return n
 }
 
+//Is establishes equality for error types
+func (e Error) Is(target error) bool {
+	return e.Error() == target.Error()
+}
+
 //NewError returns a new Error with a custom message
 func NewError(fmStr string, els ...interface{}) Error {
 	return Error{

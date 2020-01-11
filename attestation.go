@@ -50,7 +50,7 @@ func (asf AttestationStatementFormat) Valid() error {
 
 //VerifyNoneAttestationStatement verifies that at attestation statement of type
 //"none" is valid
-func VerifyNoneAttestationStatement(attStmt cbor.RawMessage, _ []byte, _ [32]byte) error {
+func VerifyNoneAttestationStatement(attStmt []byte, _ []byte, _ [32]byte) error {
 	if !bytes.Equal([]byte(attStmt), []byte{0xa0}) { //empty map
 		return ErrVerifyAttestation.Wrap(NewError("Attestation format none with non-empty statement: %#v", attStmt))
 	}

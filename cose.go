@@ -152,7 +152,6 @@ func VerifySignature(rawKey cbor.RawMessage, message, sig []byte) error {
 			return nil
 		}
 		return ErrVerifySignature.Wrap(NewError("EdDSA signature verification failed"))
-
 	}
 	return ErrVerifySignature.Wrap(NewError("COSE algorithm ID %d not supported", coseKey.Alg))
 }
