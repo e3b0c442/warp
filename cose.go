@@ -55,6 +55,16 @@ const (
 	CurveP521 COSEEllipticCurve = 3
 )
 
+//COSEKeyType is a number identifying a key type
+type COSEKeyType int
+
+//enum values for COSEKeyType type
+const (
+	KeyTypeOKP COSEKeyType = 1
+	KeyTypeEC2 COSEKeyType = 2
+	KeyTypeRSA COSEKeyType = 3
+)
+
 //VerifySignature verifies a signature using a provided COSEKey, message, and
 //signature
 func VerifySignature(rawKey cbor.RawMessage, message, sig []byte) error {
@@ -132,35 +142,27 @@ func VerifySignature(rawKey cbor.RawMessage, message, sig []byte) error {
 func DecodePublicKey(coseKey *COSEKey) (crypto.PublicKey, error) {
 	var publicKey crypto.PublicKey
 
-	switch COSEAlgorithmIdentifier(coseKey.Alg) {
-	case AlgorithmES256,
-		AlgorithmES384,
-		AlgorithmES512:
-		k, err := decodeECDSAPublicKey(coseKey)
-		if err != nil {
-			return nil, ErrDecodeCOSEKey.Wrap(err)
-		}
-		publicKey = k
-	case AlgorithmRS1,
-		AlgorithmRS512,
-		AlgorithmRS384,
-		AlgorithmRS256,
-		AlgorithmPS512,
-		AlgorithmPS384,
-		AlgorithmPS256:
-		k, err := decodeRSAPublicKey(coseKey)
-		if err != nil {
-			return nil, ErrDecodeCOSEKey.Wrap(err)
-		}
-		publicKey = k
-	case AlgorithmEdDSA:
+	switch COSEKeyType(coseKey.Kty) {
+	case KeyTypeOKP:
 		k, err := decodeEd25519PublicKey(coseKey)
 		if err != nil {
 			return nil, ErrDecodeCOSEKey.Wrap(err)
 		}
 		publicKey = k
+	case KeyTypeEC2:
+		k, err := decodeECDSAPublicKey(coseKey)
+		if err != nil {
+			return nil, ErrDecodeCOSEKey.Wrap(err)
+		}
+		publicKey = k
+	case KeyTypeRSA:
+		k, err := decodeRSAPublicKey(coseKey)
+		if err != nil {
+			return nil, ErrDecodeCOSEKey.Wrap(err)
+		}
+		publicKey = k
 	default:
-		return nil, ErrDecodeCOSEKey.Wrap(NewError("COSE algorithm ID %d not supported", coseKey.Alg))
+		return nil, ErrDecodeCOSEKey.Wrap(NewError("COSE key type %d not supported", coseKey.Kty))
 	}
 
 	return publicKey, nil

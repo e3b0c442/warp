@@ -19,6 +19,528 @@ import (
 	"github.com/fxamacker/cbor"
 )
 
+func TestVerifySignature(t *testing.T) {
+	type verifyTest struct {
+		Name      string
+		COSEKey   *COSEKey
+		RawKey    cbor.RawMessage
+		PrivKey   interface{}
+		Hash      crypto.Hash
+		MangleSig bool
+		IsRSAPSS  bool
+		Err       error
+	}
+
+	goodP256X, _ := cbor.Marshal(goodP256Key.PublicKey.X.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	goodP256Y, _ := cbor.Marshal(goodP256Key.PublicKey.Y.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+
+	good1024N, _ := cbor.Marshal(good1024Key.PublicKey.N.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	good1024EBuf := &bytes.Buffer{}
+	binary.Write(good1024EBuf, binary.BigEndian, int32(good1024Key.PublicKey.E))
+	good1024E, _ := cbor.Marshal(good1024EBuf.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+
+	good25519X, _ := cbor.Marshal(good25519Pub, cbor.EncOptions{Sort: cbor.SortCTAP2})
+
+	tests := []verifyTest{
+		{
+			Name:    "Invalid CBOR",
+			RawKey:  []byte{0x42, 0x00},
+			PrivKey: good25519Priv,
+			Err:     ErrVerifySignature,
+		},
+		{
+			Name:    "Bad key",
+			RawKey:  []byte{0xa0},
+			PrivKey: good25519Priv,
+			Err:     ErrVerifySignature,
+		},
+		{
+			Name: "Wrong key type for ECDSA",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmES256),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey: goodP256Key,
+			Hash:    crypto.SHA256,
+			Err:     ErrVerifySignature,
+		},
+		{
+			Name: "Good ES256",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeEC2),
+				Alg:       int(AlgorithmES256),
+				CrvOrNOrK: []byte{0x01},
+				XOrE:      goodP256X,
+				Y:         goodP256Y,
+			},
+			PrivKey: goodP256Key,
+			Hash:    crypto.SHA256,
+		},
+		{
+			Name: "Bad ES256",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeEC2),
+				Alg:       int(AlgorithmES256),
+				CrvOrNOrK: []byte{0x01},
+				XOrE:      goodP256X,
+				Y:         goodP256Y,
+			},
+			PrivKey:   goodP256Key,
+			Hash:      crypto.SHA256,
+			MangleSig: true,
+			Err:       ErrVerifySignature,
+		},
+		{
+			Name: "Good ES384",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeEC2),
+				Alg:       int(AlgorithmES384),
+				CrvOrNOrK: []byte{0x01},
+				XOrE:      goodP256X,
+				Y:         goodP256Y,
+			},
+			PrivKey: goodP256Key,
+			Hash:    crypto.SHA384,
+		},
+		{
+			Name: "Bad ES384",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeEC2),
+				Alg:       int(AlgorithmES384),
+				CrvOrNOrK: []byte{0x01},
+				XOrE:      goodP256X,
+				Y:         goodP256Y,
+			},
+			PrivKey:   goodP256Key,
+			Hash:      crypto.SHA384,
+			MangleSig: true,
+			Err:       ErrVerifySignature,
+		},
+		{
+			Name: "Good ES512",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeEC2),
+				Alg:       int(AlgorithmES512),
+				CrvOrNOrK: []byte{0x01},
+				XOrE:      goodP256X,
+				Y:         goodP256Y,
+			},
+			PrivKey: goodP256Key,
+			Hash:    crypto.SHA512,
+		},
+		{
+			Name: "Bad ES512",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeEC2),
+				Alg:       int(AlgorithmES512),
+				CrvOrNOrK: []byte{0x01},
+				XOrE:      goodP256X,
+				Y:         goodP256Y,
+			},
+			PrivKey:   goodP256Key,
+			Hash:      crypto.SHA512,
+			MangleSig: true,
+			Err:       ErrVerifySignature,
+		},
+		{
+			Name: "Wrong key type for RSA",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeEC2),
+				Alg:       int(AlgorithmRS1),
+				CrvOrNOrK: []byte{0x01},
+				XOrE:      goodP256X,
+				Y:         goodP256Y,
+			},
+			PrivKey: good1024Key,
+			Hash:    crypto.SHA1,
+			Err:     ErrVerifySignature,
+		},
+		{
+			Name: "Good RS1",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmRS1),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey: good1024Key,
+			Hash:    crypto.SHA1,
+		},
+		{
+			Name: "Bad RS1",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmRS1),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey:   good1024Key,
+			Hash:      crypto.SHA1,
+			MangleSig: true,
+			Err:       ErrVerifySignature,
+		},
+		{
+			Name: "Good RS256",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmRS256),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey: good1024Key,
+			Hash:    crypto.SHA256,
+		},
+		{
+			Name: "Bad RS256",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmRS256),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey:   good1024Key,
+			Hash:      crypto.SHA256,
+			MangleSig: true,
+			Err:       ErrVerifySignature,
+		},
+		{
+			Name: "Good RS384",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmRS384),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey: good1024Key,
+			Hash:    crypto.SHA384,
+		},
+		{
+			Name: "Bad RS384",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmRS384),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey:   good1024Key,
+			Hash:      crypto.SHA384,
+			MangleSig: true,
+			Err:       ErrVerifySignature,
+		},
+		{
+			Name: "Good RS512",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmRS512),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey: good1024Key,
+			Hash:    crypto.SHA512,
+		},
+		{
+			Name: "Bad RS512",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmRS512),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey:   good1024Key,
+			Hash:      crypto.SHA512,
+			MangleSig: true,
+			Err:       ErrVerifySignature,
+		},
+		{
+			Name: "Good PS256",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmPS256),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey:  good1024Key,
+			Hash:     crypto.SHA256,
+			IsRSAPSS: true,
+		},
+		{
+			Name: "Bad PS256",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmPS256),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey:   good1024Key,
+			Hash:      crypto.SHA256,
+			IsRSAPSS:  true,
+			MangleSig: true,
+			Err:       ErrVerifySignature,
+		},
+		{
+			Name: "Good PS384",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmPS384),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey:  good1024Key,
+			Hash:     crypto.SHA384,
+			IsRSAPSS: true,
+		},
+		{
+			Name: "Bad PS384",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmPS384),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey:   good1024Key,
+			Hash:      crypto.SHA384,
+			MangleSig: true,
+			IsRSAPSS:  true,
+			Err:       ErrVerifySignature,
+		},
+		{
+			Name: "Good PS512",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmPS512),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey:  good1024Key,
+			Hash:     crypto.SHA512,
+			IsRSAPSS: true,
+		},
+		{
+			Name: "Bad PS512",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmPS512),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey:   good1024Key,
+			Hash:      crypto.SHA512,
+			MangleSig: true,
+			IsRSAPSS:  true,
+			Err:       ErrVerifySignature,
+		},
+		{
+			Name: "Wrong key type for EdDSA",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				Alg:       int(AlgorithmEdDSA),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			PrivKey: good25519Priv,
+			Err:     ErrVerifySignature,
+		},
+		{
+			Name: "Good EdDSA",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeOKP),
+				Alg:       int(AlgorithmEdDSA),
+				CrvOrNOrK: []byte{0x06},
+				XOrE:      good25519X,
+			},
+			PrivKey: good25519Priv,
+		},
+		{
+			Name: "Bad EdDSA",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeOKP),
+				Alg:       int(AlgorithmEdDSA),
+				CrvOrNOrK: []byte{0x06},
+				XOrE:      good25519X,
+			},
+			PrivKey:   good25519Priv,
+			MangleSig: true,
+			Err:       ErrVerifySignature,
+		},
+		{
+			Name: "Bad algorithm",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeOKP),
+				Alg:       -4096,
+				CrvOrNOrK: []byte{0x06},
+				XOrE:      good25519X,
+			},
+			PrivKey: good25519Priv,
+			Err:     ErrVerifySignature,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(tt *testing.T) {
+			msg := []byte("I've got a lovely bunch of coconuts")
+			var sig []byte
+			var err error
+
+			switch k := test.PrivKey.(type) {
+			case *ecdsa.PrivateKey:
+				h := test.Hash.New()
+				h.Write(msg)
+				r, s, err := ecdsa.Sign(rand.Reader, k, h.Sum(nil))
+				if err != nil {
+					tt.Fatalf("Error signing ECDSA: %v", err)
+				}
+				sig, err = asn1.Marshal(struct {
+					R, S *big.Int
+				}{R: r, S: s})
+				if err != nil {
+					tt.Fatalf("Error marshaling ECDSA signature: %v", err)
+				}
+			case *rsa.PrivateKey:
+				h := test.Hash.New()
+				h.Write(msg)
+				if test.IsRSAPSS {
+					sig, err = rsa.SignPSS(rand.Reader, k, test.Hash, h.Sum(nil), nil)
+					if err != nil {
+						tt.Fatalf("Error signing RSA-PSS: %v", err)
+					}
+				} else {
+					sig, err = rsa.SignPKCS1v15(rand.Reader, k, test.Hash, h.Sum(nil))
+					if err != nil {
+						tt.Fatalf("Error signing RSA-PKCS1v15: %v", err)
+					}
+				}
+			case ed25519.PrivateKey:
+				sig = ed25519.Sign(k, msg)
+			}
+
+			var rawKey cbor.RawMessage
+			if test.RawKey != nil {
+				rawKey = test.RawKey
+			} else {
+				rawKey, err = cbor.Marshal(test.COSEKey, cbor.EncOptions{Sort: cbor.SortCTAP2})
+				if err != nil {
+					t.Fatalf("Error marshaling test key: %v", err)
+				}
+			}
+
+			if test.MangleSig {
+				b := make([]byte, len(sig))
+				rand.Read(b)
+				for i := range b {
+					sig[i] = sig[i] ^ b[i]
+				}
+			}
+
+			err = VerifySignature(rawKey, msg, sig)
+			if err != nil {
+				if errors.Is(err, test.Err) {
+					return
+				}
+				tt.Fatalf("Unexpected error %v", err)
+			}
+			if test.Err != nil {
+				tt.Fatal("Did not get expected error")
+			}
+		})
+	}
+}
+
+func TestDecodePublicKey(t *testing.T) {
+	type decodeTest struct {
+		Name    string
+		COSEKey *COSEKey
+		Err     error
+	}
+
+	goodP256X, _ := cbor.Marshal(goodP256Key.PublicKey.X.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	goodP256Y, _ := cbor.Marshal(goodP256Key.PublicKey.Y.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+
+	good1024N, _ := cbor.Marshal(good1024Key.PublicKey.N.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	good1024EBuf := &bytes.Buffer{}
+	binary.Write(good1024EBuf, binary.BigEndian, int32(good1024Key.PublicKey.E))
+	good1024E, _ := cbor.Marshal(good1024EBuf.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+
+	good25519X, _ := cbor.Marshal(good25519Pub, cbor.EncOptions{Sort: cbor.SortCTAP2})
+
+	tests := []decodeTest{
+		{
+			Name: "Bad algorithm",
+			COSEKey: &COSEKey{
+				Alg: -4096,
+			},
+			Err: ErrDecodeCOSEKey,
+		},
+		{
+			Name: "Bad RSA",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				CrvOrNOrK: []byte{0xa0},
+			},
+			Err: ErrDecodeCOSEKey,
+		},
+		{
+			Name: "Good RSA",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeRSA),
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+		},
+		{
+			Name: "Bad EC2",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeEC2),
+				CrvOrNOrK: []byte{0xa0},
+			},
+			Err: ErrDecodeCOSEKey,
+		},
+		{
+			Name: "Good EC2",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeEC2),
+				CrvOrNOrK: []byte{0x01},
+				XOrE:      goodP256X,
+				Y:         goodP256Y,
+			},
+		},
+		{
+			Name: "Bad OKP",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeOKP),
+				CrvOrNOrK: []byte{0xa0},
+			},
+			Err: ErrDecodeCOSEKey,
+		},
+		{
+			Name: "Good OKP",
+			COSEKey: &COSEKey{
+				Kty:       int(KeyTypeOKP),
+				CrvOrNOrK: []byte{0x06},
+				XOrE:      []byte(good25519X),
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.Name, func(tt *testing.T) {
+			k, err := DecodePublicKey(test.COSEKey)
+			if err != nil {
+				if errors.Is(err, test.Err) {
+					return
+				}
+				tt.Fatalf("Unexpected error %v", err)
+			}
+			if test.Err != nil {
+				tt.Fatalf("Did not get expected error")
+			}
+			if k == nil {
+				tt.Fatalf("Key is nil with no error")
+			}
+		})
+	}
+}
+
 func TestDecodeECDSAPublicKey(t *testing.T) {
 	type decodeECDSATest struct {
 		Name      string
@@ -27,21 +549,14 @@ func TestDecodeECDSAPublicKey(t *testing.T) {
 		Err       error
 	}
 
-	goodP256Key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	goodP256X, err := cbor.Marshal(goodP256Key.PublicKey.X.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
-	goodP256Y, err := cbor.Marshal(goodP256Key.PublicKey.Y.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	goodP256X, _ := cbor.Marshal(goodP256Key.PublicKey.X.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	goodP256Y, _ := cbor.Marshal(goodP256Key.PublicKey.Y.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
 
-	goodP384Key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-	goodP384X, err := cbor.Marshal(goodP384Key.PublicKey.X.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
-	goodP384Y, err := cbor.Marshal(goodP384Key.PublicKey.Y.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	goodP384X, _ := cbor.Marshal(goodP384Key.PublicKey.X.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	goodP384Y, _ := cbor.Marshal(goodP384Key.PublicKey.Y.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
 
-	goodP521Key, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
-	goodP521X, err := cbor.Marshal(goodP521Key.PublicKey.X.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
-	goodP521Y, err := cbor.Marshal(goodP521Key.PublicKey.Y.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
-
-	if err != nil {
-		t.Fatal("Unable to initialize testing keys")
-	}
+	goodP521X, _ := cbor.Marshal(goodP521Key.PublicKey.X.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	goodP521Y, _ := cbor.Marshal(goodP521Key.PublicKey.Y.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
 
 	tests := []decodeECDSATest{
 		{
@@ -279,27 +794,20 @@ func TestDecodeRSAPublicKey(t *testing.T) {
 		Err       error
 	}
 
-	good2048Key, err := rsa.GenerateKey(rand.Reader, 2048)
-	good2048N, err := cbor.Marshal(good2048Key.PublicKey.N.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	good1024N, _ := cbor.Marshal(good1024Key.PublicKey.N.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	good1024EBuf := &bytes.Buffer{}
+	binary.Write(good1024EBuf, binary.BigEndian, int32(good1024Key.PublicKey.E))
+	good1024E, _ := cbor.Marshal(good1024EBuf.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+
+	good2048N, _ := cbor.Marshal(good2048Key.PublicKey.N.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
 	good2048EBuf := &bytes.Buffer{}
-	err = binary.Write(good2048EBuf, binary.BigEndian, int32(good2048Key.PublicKey.E))
-	if err != nil {
-		t.Fatal(err)
-	}
-	good2048E, err := cbor.Marshal(good2048EBuf.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	binary.Write(good2048EBuf, binary.BigEndian, int32(good2048Key.PublicKey.E))
+	good2048E, _ := cbor.Marshal(good2048EBuf.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
 
-	good4096Key, err := rsa.GenerateKey(rand.Reader, 4096)
-	good4096N, err := cbor.Marshal(good4096Key.PublicKey.N.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	good4096N, _ := cbor.Marshal(good4096Key.PublicKey.N.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
 	good4096EBuf := &bytes.Buffer{}
-	err = binary.Write(good4096EBuf, binary.BigEndian, int32(good4096Key.PublicKey.E))
-	if err != nil {
-		t.Fatal(err)
-	}
-	good4096E, err := cbor.Marshal(good4096EBuf.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
-
-	if err != nil {
-		t.Fatalf("Unable to initialize testing keys")
-	}
+	binary.Write(good4096EBuf, binary.BigEndian, int32(good4096Key.PublicKey.E))
+	good4096E, _ := cbor.Marshal(good4096EBuf.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
 
 	tests := []decodeRSATest{
 		{
@@ -339,6 +847,14 @@ func TestDecodeRSAPublicKey(t *testing.T) {
 				XOrE:      []byte{0x43, 0x01, 0x02, 0x03},
 			},
 			Err: NewError("Error decoding RSA exponent"),
+		},
+		{
+			Name: "Good 1024",
+			COSEKey: &COSEKey{
+				CrvOrNOrK: good1024N,
+				XOrE:      good1024E,
+			},
+			KeyTester: good1024Key,
 		},
 		{
 			Name: "Good 2048",
@@ -585,11 +1101,10 @@ func TestDecodeEd25519PublicKey(t *testing.T) {
 		Err       error
 	}
 
-	goodKeyPub, goodKeyPriv, err := ed25519.GenerateKey(rand.Reader)
+	goodKeyX, err := cbor.Marshal(good25519Pub, cbor.EncOptions{Sort: cbor.SortCTAP2})
 	if err != nil {
-		t.Fatal("Unable to initialize testing key")
+		t.Fatalf("Error marshalig pubkey: %v", err)
 	}
-	goodKeyX, err := cbor.Marshal(goodKeyPub, cbor.EncOptions{Sort: cbor.SortCTAP2})
 
 	tests := []decodeEd25519Test{
 		{
@@ -612,7 +1127,7 @@ func TestDecodeEd25519PublicKey(t *testing.T) {
 				//CrvOrNOrK: []byte{0x06},
 				XOrE: goodKeyX,
 			},
-			KeyTester: goodKeyPriv,
+			KeyTester: good25519Priv,
 		},
 	}
 
