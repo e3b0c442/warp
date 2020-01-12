@@ -40,7 +40,6 @@ type RelyingParty interface {
 	Name() string
 	Icon() string
 	Origin() string
-	CredentialExists(string) bool
 }
 ```
 
@@ -51,7 +50,6 @@ authentication ceremonies.
 * `Name() string`: A human-palatable name for the Relying Party.
 * `Icon() string`: A URL which resolves an image associated with the Relying Party. May be the empty string.
 * `Origin() string`: The fully qualified origin of the Relying Party.
-* `CredentialExists(string) bool`: Returns true if the credential identified by the ID provided in the parameter has already been registered with the system. The credential is the base64url encoded version of the raw ID.
 
 #### `User`
 
@@ -137,13 +135,14 @@ The returned object or its data must be stored in the server-side session cache 
 #### `FinishRegistration`
 
 ```go
-func FinishRegistration(rp RelyingParty, opts *PublicKeyCredentialCreationOptions, cred *AttestationPublicKeyCredential) (string, []byte, error)
+func FinishRegistration(rp RelyingParty, credFinder CredentialFinder, opts *PublicKeyCredentialCreationOptions, cred *AttestationPublicKeyCredential) (string, []byte, error)
 ```
 
 `FinishRegistration` completes the registration ceremony, by verifying the public key credential sent by the client against the stored creation options. If the verification is successful, a credential ID and public key are returned which must be stored. It is the responsibility of the implementor to store these and associate with the calling user.
 
 ##### Parameters:
 * `rp`: An object which implements the `RelyingParty` interface
+* `credFinder`: A function conforming to `CredentialFinder` which is used to check if a credential ID already exists in the system
 * `opts`: A pointer to the stored `PublicKeyCredentialCreationOptions` which was previously sent to the client
 * `cred`: The parsed `AttestationPublicKeyCredential` that was sent from the client in response to the server challenge
 
