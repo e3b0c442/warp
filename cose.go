@@ -226,14 +226,14 @@ func verifyECDSASignature(pubKey *ecdsa.PublicKey, hash crypto.Hash, message, si
 func decodeRSAPublicKey(coseKey *COSEKey) (*rsa.PublicKey, error) {
 	var nBytes, eBytes []byte
 	if err := cbor.Unmarshal(coseKey.CrvOrNOrK, &nBytes); err != nil {
-		return nil, NewError("Error decoding RSA modulus").Wrap(err)
+		return nil, NewError("Error unmarshaling RSA modulus").Wrap(err)
 	}
 	if err := cbor.Unmarshal(coseKey.XOrE, &eBytes); err != nil {
-		return nil, NewError("Error decoding RSA exponent").Wrap(err)
+		return nil, NewError("Error unmarshaling RSA exponent").Wrap(err)
 	}
 
-	var n *big.Int
-	var e int
+	n := big.NewInt(0)
+	var e int32
 	n = n.SetBytes(nBytes)
 	if err := binary.Read(bytes.NewBuffer(eBytes), binary.BigEndian, &e); err != nil {
 		return nil, NewError("Error decoding RSA exponent").Wrap(err)
@@ -241,7 +241,7 @@ func decodeRSAPublicKey(coseKey *COSEKey) (*rsa.PublicKey, error) {
 
 	return &rsa.PublicKey{
 		N: n,
-		E: e,
+		E: int(e),
 	}, nil
 }
 
@@ -269,7 +269,7 @@ func verifyRSAPSSSignature(pubKey *rsa.PublicKey, hash crypto.Hash, message, sig
 
 func decodeEd25519PublicKey(coseKey *COSEKey) (ed25519.PublicKey, error) {
 	var kBytes []byte
-	if err := cbor.Unmarshal(coseKey.CrvOrNOrK, &kBytes); err != nil {
+	if err := cbor.Unmarshal(coseKey.XOrE, &kBytes); err != nil {
 		return nil, NewError("Error unmarshaling Ed25519 public key").Wrap(err)
 	}
 
