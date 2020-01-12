@@ -100,12 +100,9 @@ func (acd *AttestedCredentialData) Decode(data io.Reader) error {
 	}
 
 	acd.CredentialID = make([]byte, credLen)
-	n, err = data.Read(acd.CredentialID)
+	_, err = data.Read(acd.CredentialID)
 	if err != nil {
 		return ErrDecodeAttestedCredentialData.Wrap(NewError("Error reading credential ID").Wrap(err))
-	}
-	if uint16(n) < credLen {
-		return ErrDecodeAttestedCredentialData.Wrap(NewError("Expected %d bytes of credential ID data, got %d", credLen, n))
 	}
 
 	err = cbor.NewDecoder(data).Decode(&acd.CredentialPublicKey)

@@ -9,9 +9,15 @@ import (
 	"log"
 	"os"
 	"testing"
+
+	"github.com/fxamacker/cbor"
 )
 
 var goodP256Key *ecdsa.PrivateKey
+var goodP256X cbor.RawMessage
+var goodP256Y cbor.RawMessage
+var goodP256COSE *COSEKey
+var goodP256Raw cbor.RawMessage
 var goodP384Key *ecdsa.PrivateKey
 var goodP521Key *ecdsa.PrivateKey
 var good1024Key *rsa.PrivateKey
@@ -56,6 +62,28 @@ func TestMain(m *testing.M) {
 	good25519Pub, good25519Priv, err = ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		log.Fatalf("Key gen error: %v", err)
+	}
+
+	goodP256X, err = cbor.Marshal(goodP256Key.PublicKey.X.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	if err != nil {
+		log.Fatalf("X marshal err: %v", err)
+	}
+	goodP256Y, err = cbor.Marshal(goodP256Key.PublicKey.X.Bytes(), cbor.EncOptions{Sort: cbor.SortCTAP2})
+	if err != nil {
+		log.Fatalf("Y marshal err: %v", err)
+	}
+
+	goodP256COSE = &COSEKey{
+		Kty:       int(KeyTypeEC2),
+		Alg:       int(AlgorithmES256),
+		CrvOrNOrK: []byte{1},
+		XOrE:      goodP256X,
+		Y:         goodP256Y,
+	}
+
+	goodP256Raw, err = cbor.Marshal(goodP256COSE, cbor.EncOptions{Sort: cbor.SortCTAP2})
+	if err != nil {
+		log.Fatalf("COSEKey marshal err: %v", err)
 	}
 
 	os.Exit(m.Run())
