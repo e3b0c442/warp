@@ -34,7 +34,6 @@ type RelyingParty interface {
 	Name() string
 	Icon() string
 	Origin() string
-	CredentialExists(string) bool
 }
 
 //ChallengeLength represents the size of the generated challenge. Must be

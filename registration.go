@@ -80,6 +80,7 @@ func SupportedPublicKeyCredentialParameters() []PublicKeyCredentialParameters {
 //to be stored.
 func FinishRegistration(
 	rp RelyingParty,
+	credFinder CredentialFinder,
 	opts *PublicKeyCredentialCreationOptions,
 	cred *AttestationPublicKeyCredential,
 ) (
@@ -208,7 +209,7 @@ func FinishRegistration(
 	//ceremony, or it MAY decide to accept the registration, e.g. while deleting
 	//the older registration.
 	//TODO implement optional deletion
-	if rp.CredentialExists(base64.RawURLEncoding.EncodeToString(authData.AttestedCredentialData.CredentialID)) {
+	if _, err := credFinder(base64.RawURLEncoding.EncodeToString(authData.AttestedCredentialData.CredentialID)); err == nil {
 		return "", nil, ErrVerifyRegistration.Wrap(NewError("Credential with this ID already exists"))
 	}
 

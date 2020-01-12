@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"strings"
 )
@@ -51,7 +50,7 @@ func verifyChallenge(C *CollectedClientData, challenge []byte) error {
 	}
 
 	if !bytes.Equal(rawChallenge, challenge) {
-		return fmt.Errorf("Challenge mismatch: got [% X] expected [% X]", rawChallenge, challenge)
+		return NewError("Challenge mismatch: got [% X] expected [% X]", rawChallenge, challenge)
 	}
 	return nil
 }
@@ -74,7 +73,7 @@ func verifyTokenBinding(C *CollectedClientData) error {
 				//Golang standard library
 			}
 		default:
-			return fmt.Errorf("Invalid token binding status %s", C.TokenBinding.Status)
+			return NewError("Invalid token binding status %s", C.TokenBinding.Status)
 		}
 	}
 	return nil
@@ -83,7 +82,7 @@ func verifyTokenBinding(C *CollectedClientData) error {
 func verifyRPIDHash(RPID string, authData *AuthenticatorData) error {
 	rpIDHash := sha256.Sum256([]byte(RPID))
 	if !bytes.Equal(rpIDHash[:], authData.RPIDHash[:]) {
-		return fmt.Errorf("RPID hash does not match authData (RPID: %s)", RPID)
+		return NewError("RPID hash does not match authData (RPID: %s)", RPID)
 	}
 	return nil
 }
@@ -106,7 +105,7 @@ func verifyClientExtensionsOutputs(ins AuthenticationExtensionsClientInputs, out
 	for k, credV := range outs {
 		optsV, ok := ins[k]
 		if !ok {
-			return NewError("Extension key %s provided in credential but not creation options", k)
+			return NewError("Extension key %s provided in credential but not options", k)
 		}
 
 		if validator, ok := ExtensionValidators[k]; ok { //ignore if no validator
