@@ -15,11 +15,11 @@ type AuthenticationExtensionsClientOutputs map[string]interface{}
 
 //Extension defines an extension to a creation options or request options
 //object
-type Extension func(map[string]interface{})
+type Extension func(AuthenticationExtensionsClientInputs)
 
 //BuildExtensions builds the extension map to be added to the options object
 func BuildExtensions(exts ...Extension) AuthenticationExtensionsClientInputs {
-	extensions := make(map[string]interface{})
+	extensions := make(AuthenticationExtensionsClientInputs)
 
 	for _, ext := range exts {
 		ext(extensions)
@@ -30,7 +30,7 @@ func BuildExtensions(exts ...Extension) AuthenticationExtensionsClientInputs {
 
 //UseAppID adds the appid extension to the extensions object. §10.1
 func UseAppID(appID string) Extension {
-	return func(e map[string]interface{}) {
+	return func(e AuthenticationExtensionsClientInputs) {
 		e[ExtensionAppID] = appID
 	}
 }
@@ -53,7 +53,7 @@ func VerifyAppID(_, out interface{}) error {
 
 //EffectiveRPID returns the effective relying party ID for the ceremony based on
 //the usage of the AppID extension
-func EffectiveRPID(opts *PublicKeyCredentialCreationOptions, cred *AttestationPublicKeyCredential) string {
+func EffectiveRPID(opts *PublicKeyCredentialRequestOptions, cred *AssertionPublicKeyCredential) string {
 	if credV, ok := cred.Extensions[ExtensionAppID]; ok {
 		if useAppID, ok := credV.(bool); ok && useAppID {
 			if optsV, ok := opts.Extensions[ExtensionAppID]; ok {
@@ -63,5 +63,5 @@ func EffectiveRPID(opts *PublicKeyCredentialCreationOptions, cred *AttestationPu
 			}
 		}
 	}
-	return opts.RP.ID
+	return opts.RPID
 }

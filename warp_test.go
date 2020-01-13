@@ -8,6 +8,7 @@ import (
 	"crypto/rsa"
 	"log"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/fxamacker/cbor"
@@ -87,4 +88,32 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(m.Run())
+}
+
+func TestSupportedKeyAlgorithms(t *testing.T) {
+	algs := SupportedKeyAlgorithms()
+	if !reflect.DeepEqual(algs, []COSEAlgorithmIdentifier{
+		AlgorithmEdDSA,
+		AlgorithmES512,
+		AlgorithmES384,
+		AlgorithmES256,
+		AlgorithmPS512,
+		AlgorithmPS384,
+		AlgorithmPS256,
+		AlgorithmRS512,
+		AlgorithmRS384,
+		AlgorithmRS256,
+		AlgorithmRS1,
+	}) {
+		t.Fatal("Unexpected result")
+	}
+}
+
+func TestSupportedAttestationStatementFormats(t *testing.T) {
+	fmts := SupportedAttestationStatementFormats()
+	if !reflect.DeepEqual(fmts, []AttestationStatementFormat{
+		StatementNone,
+	}) {
+		t.Fatal("Unexpected result")
+	}
 }
