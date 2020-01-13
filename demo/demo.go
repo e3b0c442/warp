@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -22,54 +23,87 @@ import (
 	"github.com/e3b0c442/warp"
 )
 
-type user struct {
-	name string
-	id   []byte
-}
-
-func (u *user) UserID() []byte {
-	return u.id
-}
-
-func (u *user) UserName() string {
-	return u.name
-}
-
-func (u *user) UserDisplayName() string {
-	return u.name
-}
-
-func (u *user) UserIcon() string {
-	return ""
-}
-
 type rp struct {
 	origin string
 }
 
-func (r rp) RelyingPartyID() string {
+func (r rp) ID() string {
 	u, _ := url.Parse(r.origin)
 	return u.Hostname()
 }
 
-func (r rp) RelyingPartyName() string {
+func (r rp) Name() string {
 	return r.origin
 }
-func (r rp) RelyingPartyIcon() string {
+func (r rp) Icon() string {
 	return ""
 }
-func (r rp) RelyingPartyOrigin() string {
+func (r rp) Origin() string {
 	return r.origin
 }
-func (r rp) CredentialExists(id []byte) bool {
-	return false
+
+type user struct {
+	name        string
+	id          []byte
+	credentials map[string]warp.Credential
+}
+
+func (u *user) ID() []byte {
+	return u.id
+}
+
+func (u *user) Name() string {
+	return u.name
+}
+
+func (u *user) DisplayName() string {
+	return u.name
+}
+
+func (u *user) Icon() string {
+	return ""
+}
+
+func (u *user) Credentials() map[string]warp.Credential {
+	return u.credentials
+}
+
+type credential struct {
+	id       string
+	pubkey   []byte
+	username string
+}
+
+func (c *credential) User() warp.User {
+	return users[c.username]
+}
+
+func (c *credential) ID() string {
+	return c.id
+}
+
+func (c *credential) PublicKey() []byte {
+	return c.pubkey
+}
+
+func (c *credential) SignCount() uint {
+	return 0
+}
+
+func findCredential(id string) (warp.Credential, error) {
+	if c, ok := credentials[id]; ok {
+		return c, nil
+	}
+	return nil, fmt.Errorf("No credential")
 }
 
 type SessionData struct {
 	CreationOptions *warp.PublicKeyCredentialCreationOptions
+	RequestOptions  *warp.PublicKeyCredentialRequestOptions
 }
 
-var users map[string]*user
+var users map[string]warp.User
+var credentials map[string]warp.Credential
 var relyingParty rp
 var sessions map[string]SessionData
 
@@ -110,7 +144,8 @@ func main() {
 	relyingParty = rp{
 		origin: origin,
 	}
-	users = make(map[string]*user)
+	users = make(map[string]warp.User)
+	credentials = make(map[string]warp.Credential)
 	sessions = make(map[string]SessionData)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -124,6 +159,8 @@ func main() {
 	})
 	http.HandleFunc("/register/start", startRegistration)
 	http.HandleFunc("/register/finish", finishRegistration)
+	http.HandleFunc("/authenticate/start", startAuthentication)
+	http.HandleFunc("/authenticate/finish", finishAuthentication)
 
 	log.Fatal(http.ListenAndServeTLS(bind, cert, key, nil))
 }
@@ -137,14 +174,17 @@ func startRegistration(w http.ResponseWriter, r *http.Request) {
 	username := usernames[0]
 
 	var u *user
-	if u, ok = users[username]; !ok {
+	if uu, ok := users[username]; !ok {
 		u = &user{
-			name: username,
+			name:        username,
+			id:          make([]byte, 16),
+			credentials: make(map[string]warp.Credential),
 		}
 
-		u.id = make([]byte, 16)
 		rand.Read(u.id)
 		users[username] = u
+	} else {
+		u = uu.(*user)
 	}
 
 	opts, err := warp.StartRegistration(relyingParty, u, warp.Attestation(warp.ConveyanceNone))
@@ -169,10 +209,6 @@ func finishRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	username := usernames[0]
-	if !ok {
-		http.Error(w, fmt.Sprintf("No session found for %s", username), http.StatusBadRequest)
-		return
-	}
 
 	cred := warp.AttestationPublicKeyCredential{}
 	err := json.NewDecoder(r.Body).Decode(&cred)
@@ -187,18 +223,111 @@ func finishRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	waCred, err := warp.FinishRegistration(relyingParty, session.CreationOptions, &cred)
+	id, pubkey, err := warp.FinishRegistration(relyingParty, findCredential, session.CreationOptions, &cred)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Unauthorized: %v", err), http.StatusUnauthorized)
 		for err != nil {
 			log.Printf("%v", err)
 			err = errors.Unwrap(err)
 		}
-
 		return
 	}
 
-	log.Printf("NEW CREDENTIAL: %#v", waCred)
+	toStore := credential{
+		id:       id,
+		pubkey:   pubkey,
+		username: username,
+	}
+	credentials[id] = &toStore
+	users[username].(*user).credentials[id] = &toStore
+
+	log.Printf("NEW CREDENTIAL: %#v", id, &toStore)
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func startAuthentication(w http.ResponseWriter, r *http.Request) {
+	usernames, ok := r.URL.Query()["username"]
+	if !ok || len(usernames) == 0 || usernames[0] == "" {
+		http.Error(w, "No username provided", http.StatusBadRequest)
+		return
+	}
+	username := usernames[0]
+	u, ok := users[username]
+	if !ok {
+		http.Error(w, "User not found", http.StatusUnauthorized)
+		return
+	}
+
+	opts, err := warp.StartAuthentication(warp.AllowCredentials(
+		func(user warp.User) []warp.PublicKeyCredentialDescriptor {
+			ds := []warp.PublicKeyCredentialDescriptor{}
+			for _, c := range user.Credentials() {
+				credID, _ := base64.RawURLEncoding.DecodeString(c.ID())
+				ds = append(ds, warp.PublicKeyCredentialDescriptor{
+					Type: "public-key",
+					ID:   credID,
+				})
+			}
+			return ds
+		}(u)),
+		warp.RelyingPartyID(relyingParty.ID()),
+	)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Start authenticate fail: %v", err), http.StatusInternalServerError)
+	}
+
+	sessions[username] = SessionData{
+		RequestOptions: opts,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(opts)
+}
+
+func finishAuthentication(w http.ResponseWriter, r *http.Request) {
+	usernames, ok := r.URL.Query()["username"]
+	if !ok || len(usernames) == 0 || usernames[0] == "" {
+		http.Error(w, "No username provided", http.StatusBadRequest)
+		return
+	}
+	username := usernames[0]
+
+	cred := warp.AssertionPublicKeyCredential{}
+	err := json.NewDecoder(r.Body).Decode(&cred)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Decode credential fail: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	session, ok := sessions[username]
+	if !ok {
+		http.Error(w, fmt.Sprintf("Session missing for user %s", username), http.StatusUnauthorized)
+		return
+	}
+
+	_, err = warp.FinishAuthentication(
+		relyingParty,
+		func(_ []byte) (warp.User, error) {
+			if us, ok := users[username]; ok {
+				return us, nil
+			}
+			return nil, fmt.Errorf("User not found")
+		},
+		session.RequestOptions,
+		&cred,
+	)
+
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Unauthorized: %v", err), http.StatusUnauthorized)
+		for err != nil {
+			log.Printf("%v", err)
+			err = errors.Unwrap(err)
+		}
+		return
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 

@@ -151,8 +151,8 @@ func FinishAuthentication(
 	//16. Using the credential public key looked up in step 3, verify that sig
 	//is a valid signature over the binary concatenation of authData and hash.
 	bincat := make([]byte, 0, sha256.Size+len(rawAuthData))
-	bincat = append(bincat, hash[:]...)
 	bincat = append(bincat, rawAuthData...)
+	bincat = append(bincat, hash[:]...)
 	if err := VerifySignature(storedCred.PublicKey(), bincat, sig); err != nil {
 		return 0, ErrVerifyAuthentication.Wrap(err)
 	}
