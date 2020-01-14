@@ -1,6 +1,6 @@
 # warp - *W*eb*A*uthn *R*elying *P*arty
 
-[![Azure DevOps builds](https://img.shields.io/azure-devops/build/e3b0c442/e7ec4af3-74ac-4efa-bfc3-c77eed439327/3)](https://dev.azure.com/e3b0c442/warp/_build)
+[![Build Status](https://travis-ci.org/e3b0c442/warp.svg?branch=master)](https://travis-ci.org/e3b0c442/warp)
 [![GoDoc](https://godoc.org/github.com/e3b0c442/warp?status.svg)](https://godoc.org/github.com/e3b0c442/warp)
 [![Go Report Card](https://goreportcard.com/badge/github.com/e3b0c442/warp)](https://goreportcard.com/report/github.com/e3b0c442/warp)
 [![codecov](https://codecov.io/gh/e3b0c442/warp/branch/master/graph/badge.svg)](https://codecov.io/gh/e3b0c442/warp)
