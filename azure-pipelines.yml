@@ -14,16 +14,16 @@ variables:
 
 steps:
 - script: |
-    go version
-    go get -v -t -d  ./...
+    go1.13 version
+    go1.13 get -v -t -d  ./...
   displayName: 'Install dependencies'
 
 - script: |
-    go version
-    go test -v ./...
+    go1.13 version
+    go1.13 test -v ./...
   displayName: 'Run test suite'
 
 - script: |
-    go version
-    go build -v .
+    go1.13 version
+    go1.13 build -v .
   displayName: 'Build'
