@@ -1,0 +1,102 @@
+<html>
+  <head>
+    <title>WebAuthn Relying Party demo</title>
+  </head>
+  <body>
+    <h1>WebAuth Relying Party demo</h1>
+    <label for="username">Username:</label>
+    <input type="text" id="username">
+    <button id="register-button">Register</button>
+    <button id="authenticate-button">Authenticate</button>
+    <div id="status"></div>
+  </body>
+  <script>
+    document.getElementById("register-button").addEventListener("click", register, false)
+    document.getElementById("authenticate-button").addEventListener("click", authenticate, false)
+    async function register(e) {
+      e.preventDefault();
+      const username = document.getElementById("username").value
+      const result = await (await fetch(`/register/start?username=${username}`)).json()
+      console.log(result);
+
+      result.user.id = Uint8Array.from(atob(result.user.id), c => c.charCodeAt(0))
+      result.challenge = Uint8Array.from(atob(result.challenge), c => c.charCodeAt(0))
+
+      const opts = await navigator.credentials.create({publicKey: result});
+      console.log(opts);
+
+      const toSend = {
+        id: opts.id,
+        rawId: btoa(String.fromCharCode.apply(null, new Uint8Array(opts.rawId))),
+        response: {
+          attestationObject: btoa(String.fromCharCode.apply(null, new Uint8Array(opts.response.attestationObject))),
+          clientDataJSON: btoa(String.fromCharCode.apply(null, new Uint8Array(opts.response.clientDataJSON)))
+        }
+      }
+      if(opts.extensions) {
+        toSend.extensions = opts.extensions;
+      }
+    
+      const resp = await fetch(`/register/finish?username=${username}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(toSend)
+      });
+
+      if(resp.ok) {
+        document.getElementById("status").innerText = "Registration success"
+      } else {
+        const err = await resp.text();
+        document.getElementById("status").innerText = `Registration failed: ${err}`
+      }
+    }
+
+    async function authenticate(e) {
+      e.preventDefault;
+      const username = document.getElementById("username").value
+      const result = await (await fetch(`/authenticate/start?username=${username}`)).json()
+      console.log(result);
+
+      result.challenge = Uint8Array.from(atob(result.challenge), c => c.charCodeAt(0))
+      if(result.allowCredentials) {
+        for (let i = 0; i < result.allowCredentials.length; i++) {
+          result.allowCredentials[i].id = Uint8Array.from(atob(result.allowCredentials[i].id), c => c.charCodeAt(0))
+          
+        }
+      }
+      const opts = await navigator.credentials.get({publicKey: result});
+      console.log(opts);
+
+      const toSend = {
+        id: opts.id,
+        rawId: btoa(String.fromCharCode.apply(null, new Uint8Array(opts.rawId))),
+        response: {
+          authenticatorData: btoa(String.fromCharCode.apply(null, new Uint8Array(opts.response.authenticatorData))),
+          signature: btoa(String.fromCharCode.apply(null, new Uint8Array(opts.response.signature))),
+          clientDataJSON: btoa(String.fromCharCode.apply(null, new Uint8Array(opts.response.clientDataJSON))),
+        },
+        type: opts.type
+      }
+      if(opts.extensions) {
+        toSend.extensions = opts.extensions
+      }
+
+      const resp = await fetch(`/authenticate/finish?username=${username}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(toSend)
+      });
+
+      if(resp.ok) {
+        document.getElementById("status").innerText = "Authentication success"
+      } else {
+        const err = await resp.text();
+        document.getElementById("status").innerText = `Registration failed: ${err}`
+      }
+    }
+  </script>
+</html>
