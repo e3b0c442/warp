@@ -1,4 +1,12 @@
 # warp - *W*eb*A*uthn *R*elying *P*arty
+
+[![Build Status](https://travis-ci.org/e3b0c442/warp.svg)](https://travis-ci.org/e3b0c442/warp)
+[![GoDoc](https://godoc.org/github.com/e3b0c442/warp?status.svg)](https://godoc.org/github.com/e3b0c442/warp)
+[![Go Report Card](https://goreportcard.com/badge/github.com/e3b0c442/warp)](https://goreportcard.com/report/github.com/e3b0c442/warp)
+[![codecov](https://codecov.io/gh/e3b0c442/warp/branch/master/graph/badge.svg)](https://codecov.io/gh/e3b0c442/warp)
+[![Release](https://img.shields.io/github/release/e3b0c442/warp.svg?style=flat-square)](https://github.com/e3b0c442/warp/releases)
+![GitHub](https://img.shields.io/github/license/e3b0c442/warp)
+
 _warp_ is a WebAuthn Relying Party implementation which is intended to be 100% compliant with the [W3C WebAuthn Level 1](https://https://www.w3.org/TR/webauthn-1/) standard while being HTTP implementation agnostic. It is completely standalone; simply provide your own HTTP server, backend storage and
 session storage.
 

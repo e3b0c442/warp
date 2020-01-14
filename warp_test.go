@@ -112,7 +112,7 @@ func TestSupportedKeyAlgorithms(t *testing.T) {
 func TestSupportedAttestationStatementFormats(t *testing.T) {
 	fmts := SupportedAttestationStatementFormats()
 	if !reflect.DeepEqual(fmts, []AttestationStatementFormat{
-		StatementNone,
+		AttestationFormatNone,
 	}) {
 		t.Fatal("Unexpected result")
 	}

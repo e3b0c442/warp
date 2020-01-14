@@ -25,23 +25,23 @@ type AttestationStatementFormat string
 
 //enum values for AttestationStatementFormat
 const (
-	StatementPacked           AttestationStatementFormat = "packed"
-	StatementTPM              AttestationStatementFormat = "tpm"
-	StatementAndroidKey       AttestationStatementFormat = "android-key"
-	StatementAndroidSafetyNet AttestationStatementFormat = "android-safetynet"
-	StatementFidoU2F          AttestationStatementFormat = "fido-u2f"
-	StatementNone             AttestationStatementFormat = "none"
+	AttestationFormatPacked           AttestationStatementFormat = "packed"
+	AttestationFormatTPM              AttestationStatementFormat = "tpm"
+	AttestationFormatAndroidKey       AttestationStatementFormat = "android-key"
+	AttestationFormatAndroidSafetyNet AttestationStatementFormat = "android-safetynet"
+	AttestationFormatFidoU2F          AttestationStatementFormat = "fido-u2f"
+	AttestationFormatNone             AttestationStatementFormat = "none"
 )
 
 //Valid determines if the Attestation Format Identifier is a valid value
 func (asf AttestationStatementFormat) Valid() error {
 	switch asf {
-	case StatementPacked:
-	case StatementTPM:
-	case StatementAndroidKey:
-	case StatementAndroidSafetyNet:
-	case StatementFidoU2F:
-	case StatementNone:
+	case AttestationFormatPacked:
+	case AttestationFormatTPM:
+	case AttestationFormatAndroidKey:
+	case AttestationFormatAndroidSafetyNet:
+	case AttestationFormatFidoU2F:
+	case AttestationFormatNone:
 	default:
 		return NewError("Invalid attestation statement %s", asf)
 	}

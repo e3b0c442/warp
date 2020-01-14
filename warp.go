@@ -44,7 +44,7 @@ var ChallengeLength = 32
 //currently supported by the library
 func SupportedAttestationStatementFormats() []AttestationStatementFormat {
 	return []AttestationStatementFormat{
-		StatementNone,
+		AttestationFormatNone,
 	}
 }
 

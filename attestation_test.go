@@ -15,27 +15,27 @@ func TestAttestationStatementFormatValid(t *testing.T) {
 	tests := []validTest{
 		{
 			Name: "Packed",
-			ASF:  StatementPacked,
+			ASF:  AttestationFormatPacked,
 		},
 		{
 			Name: "TPM",
-			ASF:  StatementTPM,
+			ASF:  AttestationFormatTPM,
 		},
 		{
 			Name: "Android Key",
-			ASF:  StatementAndroidKey,
+			ASF:  AttestationFormatAndroidKey,
 		},
 		{
 			Name: "Android SafetyNet",
-			ASF:  StatementAndroidSafetyNet,
+			ASF:  AttestationFormatAndroidSafetyNet,
 		},
 		{
 			Name: "FIDO U2F",
-			ASF:  StatementFidoU2F,
+			ASF:  AttestationFormatFidoU2F,
 		},
 		{
 			Name: "None",
-			ASF:  StatementNone,
+			ASF:  AttestationFormatNone,
 		},
 		{
 			Name: "Not in list",
