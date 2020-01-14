@@ -23,7 +23,7 @@ type Credential interface {
 	SignCount() uint
 }
 
-//CredentialFinder defines a funciton which takes a credential ID as a parameter
+//CredentialFinder defines a function which takes a credential ID as a parameter
 //and returns an object which implements the Credential interface and an error
 type CredentialFinder func(string) (Credential, error)
 

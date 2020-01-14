@@ -97,7 +97,7 @@ func findCredential(id string) (warp.Credential, error) {
 	return nil, fmt.Errorf("No credential")
 }
 
-type SessionData struct {
+type sessionData struct {
 	CreationOptions *warp.PublicKeyCredentialCreationOptions
 	RequestOptions  *warp.PublicKeyCredentialRequestOptions
 }
@@ -105,7 +105,7 @@ type SessionData struct {
 var users map[string]warp.User
 var credentials map[string]warp.Credential
 var relyingParty rp
-var sessions map[string]SessionData
+var sessions map[string]sessionData
 
 var (
 	bind   string
@@ -146,7 +146,7 @@ func main() {
 	}
 	users = make(map[string]warp.User)
 	credentials = make(map[string]warp.Credential)
-	sessions = make(map[string]SessionData)
+	sessions = make(map[string]sessionData)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		index, err := ioutil.ReadFile("./static/index.html")
@@ -193,7 +193,7 @@ func startRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sessions[username] = SessionData{
+	sessions[username] = sessionData{
 		CreationOptions: opts,
 	}
 
@@ -241,7 +241,7 @@ func finishRegistration(w http.ResponseWriter, r *http.Request) {
 	credentials[id] = &toStore
 	users[username].(*user).credentials[id] = &toStore
 
-	log.Printf("NEW CREDENTIAL: %#v", id, &toStore)
+	log.Printf("NEW CREDENTIAL: %#v", id)
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -277,7 +277,7 @@ func startAuthentication(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Start authenticate fail: %v", err), http.StatusInternalServerError)
 	}
 
-	sessions[username] = SessionData{
+	sessions[username] = sessionData{
 		RequestOptions: opts,
 	}
 
