@@ -2,7 +2,6 @@ package warp
 
 import (
 	"bytes"
-	"crypto/rand"
 	"errors"
 	"io"
 	"reflect"
@@ -531,7 +530,7 @@ func TestStartRegistration(t *testing.T) {
 			} else {
 				randReader = &predictableReader{}
 			}
-			defer func() { rand.Reader = oldRandReader }()
+			defer func() { randReader = oldRandReader }()
 
 			opts, err := StartRegistration(test.RP, test.User, test.Opts...)
 			if err != nil {
