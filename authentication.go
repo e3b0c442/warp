@@ -62,6 +62,9 @@ func FinishAuthentication(
 	//base64url encoding is inappropriate for your use case), look up the
 	//corresponding credential public key.
 	storedCred, err := getUserVerifiedCredential(userFinder, cred)
+	if err != nil {
+		return 0, ErrVerifyAuthentication.Wrap(err)
+	}
 
 	//4. Let cData, authData and sig denote the value of credential’s response's
 	//clientDataJSON, authenticatorData, and signature respectively.
@@ -113,7 +116,7 @@ func FinishAuthentication(
 
 	//11. Verify that the rpIdHash in authData is the SHA-256 hash of the RP ID
 	//expected by the Relying Party.
-	if err = verifyRPIDHash(opts.RPID, authData); err != nil {
+	if err = verifyRPIDHash(rp.ID(), authData); err != nil {
 		return 0, ErrVerifyAuthentication.Wrap(err)
 	}
 
@@ -161,26 +164,22 @@ func FinishAuthentication(
 	//value stored in conjunction with credential’s id attribute is nonzero,
 	//then run the following sub-step:
 	//If the signature counter value authData.signCount is:
-	if authData.SignCount > 0 || storedCred.SignCount() > 0 {
-		//greater than the signature counter value stored in conjunction with
-		//credential’s id attribute.
-		if uint(authData.SignCount) > storedCred.SignCount() {
-			// Update the stored signature counter value, associated with
-			//credential’s id attribute, to be the value of authData.signCount.
-			return uint(authData.SignCount), nil
-		}
-		//less than or equal to the signature counter value stored in
-		//conjunction with credential’s id attribute.
-		//This is a signal that the authenticator may be cloned, i.e. at least
-		//two copies of the credential private key may exist and are being used
-		//in parallel. Relying Parties should incorporate this information into
-		//their risk scoring. Whether the Relying Party updates the stored
-		//signature counter value in this case, or not, or fails the
-		//authentication ceremony or not, is Relying Party-specific.
-		return 0, ErrVerifyAuthentication.Wrap(NewError("Credential counter less than stored counter"))
+	//greater than the signature counter value stored in conjunction with
+	//credential’s id attribute.
+	if uint(authData.SignCount) >= storedCred.SignCount() {
+		// Update the stored signature counter value, associated with
+		//credential’s id attribute, to be the value of authData.signCount.
+		return uint(authData.SignCount), nil
 	}
-
-	return 0, nil
+	//less than or equal to the signature counter value stored in
+	//conjunction with credential’s id attribute.
+	//This is a signal that the authenticator may be cloned, i.e. at least
+	//two copies of the credential private key may exist and are being used
+	//in parallel. Relying Parties should incorporate this information into
+	//their risk scoring. Whether the Relying Party updates the stored
+	//signature counter value in this case, or not, or fails the
+	//authentication ceremony or not, is Relying Party-specific.
+	return 0, ErrVerifyAuthentication.Wrap(NewError("Credential counter less than stored counter"))
 }
 
 func checkAllowedCredentials(allowed []PublicKeyCredentialDescriptor, id []byte) error {
