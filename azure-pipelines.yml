@@ -14,6 +14,10 @@ variables:
 
 steps:
 - script: |
+    ln -s /usr/local/go1.13/bin/* /usr/bin/
+  displayName: 'Set up workspace'
+  
+- script: |
     go1.13 version
     go1.13 get -v -t -d  ./...
   displayName: 'Install dependencies'
