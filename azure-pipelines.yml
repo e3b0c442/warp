@@ -18,16 +18,16 @@ steps:
   displayName: 'Set up workspace'
   
 - script: |
-    go1.13 version
-    go1.13 get -v -t -d  ./...
+    go version
+    go get -v -t -d  ./...
   displayName: 'Install dependencies'
 
 - script: |
-    go1.13 version
-    go1.13 test -v ./...
+    go version
+    go test -v ./...
   displayName: 'Run test suite'
 
 - script: |
-    go1.13 version
-    go1.13 build -v .
+    go version
+    go build -v .
   displayName: 'Build'
