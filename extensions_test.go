@@ -127,102 +127,70 @@ func TestVerifyAppID(t *testing.T) {
 func TestEffectiveRPID(t *testing.T) {
 	type rpidTest struct {
 		Name     string
-		Opts     *PublicKeyCredentialRequestOptions
-		Cred     *AssertionPublicKeyCredential
+		RP       RelyingParty
+		In       AuthenticationExtensionsClientInputs
+		Out      AuthenticationExtensionsClientOutputs
 		Expected string
 	}
 
 	tests := []rpidTest{
 		{
 			Name: "missing in credential",
-			Opts: &PublicKeyCredentialRequestOptions{
-				RPID: "e3b0c442.io",
-				Extensions: AuthenticationExtensionsClientInputs{
-					"appid": "https://e3b0c442.io",
-				},
+			RP:   mockRP,
+			In: AuthenticationExtensionsClientInputs{
+				"appid": "https://e3b0c442.io",
 			},
-			Cred:     &AssertionPublicKeyCredential{},
 			Expected: "e3b0c442.io",
 		},
 		{
 			Name: "wrong type in credential",
-			Opts: &PublicKeyCredentialRequestOptions{
-				RPID: "e3b0c442.io",
-				Extensions: AuthenticationExtensionsClientInputs{
-					"appid": "https://e3b0c442.io",
-				},
+			RP:   mockRP,
+			In: AuthenticationExtensionsClientInputs{
+				"appid": "https://e3b0c442.io",
 			},
-			Cred: &AssertionPublicKeyCredential{
-				PublicKeyCredential: PublicKeyCredential{
-					Extensions: AuthenticationExtensionsClientOutputs{
-						"appid": "true",
-					},
-				},
+			Out: AuthenticationExtensionsClientOutputs{
+				"appid": "true",
 			},
 			Expected: "e3b0c442.io",
 		},
 		{
 			Name: "wrong value in credential",
-			Opts: &PublicKeyCredentialRequestOptions{
-				RPID: "e3b0c442.io",
-				Extensions: AuthenticationExtensionsClientInputs{
-					"appid": "https://e3b0c442.io",
-				},
+			RP:   mockRP,
+			In: AuthenticationExtensionsClientInputs{
+				"appid": "https://e3b0c442.io",
 			},
-			Cred: &AssertionPublicKeyCredential{
-				PublicKeyCredential: PublicKeyCredential{
-					Extensions: AuthenticationExtensionsClientOutputs{
-						"appid": false,
-					},
-				},
+			Out: AuthenticationExtensionsClientOutputs{
+				"appid": false,
 			},
 			Expected: "e3b0c442.io",
 		},
 		{
 			Name: "missing in options",
-			Opts: &PublicKeyCredentialRequestOptions{
-				RPID: "e3b0c442.io",
-			},
-			Cred: &AssertionPublicKeyCredential{
-				PublicKeyCredential: PublicKeyCredential{
-					Extensions: AuthenticationExtensionsClientOutputs{
-						"appid": true,
-					},
-				},
+			RP:   mockRP,
+			Out: AuthenticationExtensionsClientOutputs{
+				"appid": true,
 			},
 			Expected: "e3b0c442.io",
 		},
 		{
 			Name: "wrong type in options",
-			Opts: &PublicKeyCredentialRequestOptions{
-				RPID: "e3b0c442.io",
-				Extensions: AuthenticationExtensionsClientInputs{
-					"appid": 3,
-				},
+			RP:   mockRP,
+			In: AuthenticationExtensionsClientInputs{
+				"appid": 3,
 			},
-			Cred: &AssertionPublicKeyCredential{
-				PublicKeyCredential: PublicKeyCredential{
-					Extensions: AuthenticationExtensionsClientOutputs{
-						"appid": "true",
-					},
-				},
+			Out: AuthenticationExtensionsClientOutputs{
+				"appid": "true",
 			},
 			Expected: "e3b0c442.io",
 		},
 		{
 			Name: "good",
-			Opts: &PublicKeyCredentialRequestOptions{
-				RPID: "e3b0c442.io",
-				Extensions: AuthenticationExtensionsClientInputs{
-					"appid": "https://e3b0c442.io",
-				},
+			RP:   mockRP,
+			In: AuthenticationExtensionsClientInputs{
+				"appid": "https://e3b0c442.io",
 			},
-			Cred: &AssertionPublicKeyCredential{
-				PublicKeyCredential: PublicKeyCredential{
-					Extensions: AuthenticationExtensionsClientOutputs{
-						"appid": true,
-					},
-				},
+			Out: AuthenticationExtensionsClientOutputs{
+				"appid": true,
 			},
 			Expected: "https://e3b0c442.io",
 		},
@@ -230,7 +198,7 @@ func TestEffectiveRPID(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(tt *testing.T) {
-			rpid := EffectiveRPID(test.Opts, test.Cred)
+			rpid := EffectiveRPID(test.RP, test.In, test.Out)
 			if rpid != test.Expected {
 				tt.Fatalf("Got %s expected %s", rpid, test.Expected)
 			}
