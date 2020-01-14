@@ -14,7 +14,7 @@ variables:
 
 steps:
 - script: |
-    ln -s /usr/local/go1.13/bin/* /usr/bin/
+    ln -sf /usr/local/go1.13/bin/* /usr/bin/
   displayName: 'Set up workspace'
   
 - script: |
