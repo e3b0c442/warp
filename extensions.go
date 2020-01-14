@@ -53,15 +53,16 @@ func VerifyAppID(_, out interface{}) error {
 
 //EffectiveRPID returns the effective relying party ID for the ceremony based on
 //the usage of the AppID extension
-func EffectiveRPID(opts *PublicKeyCredentialRequestOptions, cred *AssertionPublicKeyCredential) string {
-	if credV, ok := cred.Extensions[ExtensionAppID]; ok {
-		if useAppID, ok := credV.(bool); ok && useAppID {
-			if optsV, ok := opts.Extensions[ExtensionAppID]; ok {
-				if appID, ok := optsV.(string); ok {
+func EffectiveRPID(rp RelyingParty, in AuthenticationExtensionsClientInputs, out AuthenticationExtensionsClientOutputs) string {
+	if outV, ok := out[ExtensionAppID]; ok {
+		if useAppID, ok := outV.(bool); ok && useAppID {
+			if inV, ok := in[ExtensionAppID]; ok {
+				if appID, ok := inV.(string); ok {
 					return appID
 				}
 			}
 		}
 	}
-	return opts.RPID
+
+	return rp.ID()
 }

@@ -116,7 +116,7 @@ func FinishAuthentication(
 
 	//11. Verify that the rpIdHash in authData is the SHA-256 hash of the RP ID
 	//expected by the Relying Party.
-	if err = verifyRPIDHash(rp.ID(), authData); err != nil {
+	if err = verifyRPIDHash(EffectiveRPID(rp, opts.Extensions, cred.Extensions), authData); err != nil {
 		return 0, ErrVerifyAuthentication.Wrap(err)
 	}
 
