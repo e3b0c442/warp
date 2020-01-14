@@ -14,7 +14,7 @@ variables:
 
 steps:
 - script: |
-    ln -sf /usr/local/go1.13/bin/* /usr/bin/
+    echo '##vso[task.prependpath]$(GOROOT)/bin'
   displayName: 'Set up workspace'
   
 - script: |
