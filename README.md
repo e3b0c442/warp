@@ -4,6 +4,7 @@
 [![GoDoc](https://godoc.org/github.com/e3b0c442/warp?status.svg)](https://godoc.org/github.com/e3b0c442/warp)
 [![Go Report Card](https://goreportcard.com/badge/github.com/e3b0c442/warp)](https://goreportcard.com/report/github.com/e3b0c442/warp)
 [![codecov](https://codecov.io/gh/e3b0c442/warp/branch/master/graph/badge.svg)](https://codecov.io/gh/e3b0c442/warp)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3625/badge)](https://bestpractices.coreinfrastructure.org/projects/3625)
 [![Release](https://img.shields.io/github/release/e3b0c442/warp.svg?style=flat-square)](https://github.com/e3b0c442/warp/releases)
 ![GitHub](https://img.shields.io/github/license/e3b0c442/warp)
 
