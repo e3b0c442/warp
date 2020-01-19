@@ -39,12 +39,12 @@ func FinishAuthentication(
 	userFinder UserFinder,
 	opts *PublicKeyCredentialRequestOptions,
 	cred *AssertionPublicKeyCredential,
-) (uint, error) {
+) (*AuthenticatorData, error) {
 	//1. If the allowCredentials option was given when this authentication
 	//ceremony was initiated, verify that credential.id identifies one of the
 	//public key credentials that were listed in allowCredentials.
 	if err := checkAllowedCredentials(opts.AllowCredentials, cred.RawID); err != nil {
-		return 0, ErrVerifyAuthentication.Wrap(err)
+		return nil, ErrVerifyAuthentication.Wrap(err)
 	}
 
 	//2. Identify the user being authenticated and verify that this user is the
@@ -63,7 +63,7 @@ func FinishAuthentication(
 	//corresponding credential public key.
 	storedCred, err := getUserVerifiedCredential(userFinder, cred)
 	if err != nil {
-		return 0, ErrVerifyAuthentication.Wrap(err)
+		return nil, ErrVerifyAuthentication.Wrap(err)
 	}
 
 	//4. Let cData, authData and sig denote the value of credential’s response's
@@ -73,7 +73,7 @@ func FinishAuthentication(
 	sig := cred.Response.Signature
 	authData, err := decodeAuthData(rawAuthData)
 	if err != nil {
-		return 0, ErrVerifyAuthentication.Wrap(err)
+		return nil, ErrVerifyAuthentication.Wrap(err)
 	}
 
 	//5. Let JSONtext be the result of running UTF-8 decode on the value of
@@ -85,24 +85,24 @@ func FinishAuthentication(
 	//of running an implementation-specific JSON parser on JSONtext.
 	C, err := parseClientData(cData)
 	if err != nil {
-		return 0, ErrVerifyAuthentication.Wrap(err)
+		return nil, ErrVerifyAuthentication.Wrap(err)
 	}
 
 	//7. Verify that the value of C.type is the string webauthn.get.
 	if C.Type != "webauthn.get" {
-		return 0, ErrVerifyAuthentication.Wrap(NewError("C.type is not webauthn.get"))
+		return nil, ErrVerifyAuthentication.Wrap(NewError("C.type is not webauthn.get"))
 	}
 
 	//8. Verify that the value of C.challenge matches the challenge that was
 	//sent to the authenticator in the PublicKeyCredentialRequestOptions passed
 	//to the get() call.
 	if err = verifyChallenge(C, opts.Challenge); err != nil {
-		return 0, ErrVerifyAuthentication.Wrap(err)
+		return nil, ErrVerifyAuthentication.Wrap(err)
 	}
 
 	//9. Verify that the value of C.origin matches the Relying Party's origin.
 	if err = verifyOrigin(C, rp); err != nil {
-		return 0, ErrVerifyAuthentication.Wrap(err)
+		return nil, ErrVerifyAuthentication.Wrap(err)
 	}
 
 	//10. Verify that the value of C.tokenBinding.status matches the state of
@@ -111,25 +111,25 @@ func FinishAuthentication(
 	//that C.tokenBinding.id matches the base64url encoding of the Token Binding
 	//ID for the connection.
 	if err = verifyTokenBinding(C); err != nil {
-		return 0, ErrVerifyAuthentication.Wrap(err)
+		return nil, ErrVerifyAuthentication.Wrap(err)
 	}
 
 	//11. Verify that the rpIdHash in authData is the SHA-256 hash of the RP ID
 	//expected by the Relying Party.
 	if err = verifyRPIDHash(EffectiveRPID(rp, opts.Extensions, cred.Extensions), authData); err != nil {
-		return 0, ErrVerifyAuthentication.Wrap(err)
+		return nil, ErrVerifyAuthentication.Wrap(err)
 	}
 
 	//12. Verify that the User Present bit of the flags in authData is set.
 	if err = verifyUserPresent(authData); err != nil {
-		return 0, ErrVerifyAuthentication.Wrap(err)
+		return nil, ErrVerifyAuthentication.Wrap(err)
 	}
 
 	//13. If user verification is required for this assertion, verify that the
 	//User Verified bit of the flags in authData is set.
 	if opts.UserVerification == VerificationRequired {
 		if err = verifyUserVerified(authData); err != nil {
-			return 0, ErrVerifyAuthentication.Wrap(err)
+			return nil, ErrVerifyAuthentication.Wrap(err)
 		}
 	}
 
@@ -144,7 +144,7 @@ func FinishAuthentication(
 	//general case, the meaning of "are as expected" is specific to the Relying
 	//Party and which extensions are in use.
 	if err := verifyClientExtensionsOutputs(opts.Extensions, cred.Extensions); err != nil {
-		return 0, ErrVerifyAuthentication.Wrap(err)
+		return nil, ErrVerifyAuthentication.Wrap(err)
 	}
 
 	//15. Let hash be the result of computing a hash over the cData using
@@ -156,8 +156,8 @@ func FinishAuthentication(
 	bincat := make([]byte, 0, sha256.Size+len(rawAuthData))
 	bincat = append(bincat, rawAuthData...)
 	bincat = append(bincat, hash[:]...)
-	if err := VerifySignature(storedCred.PublicKey(), bincat, sig); err != nil {
-		return 0, ErrVerifyAuthentication.Wrap(err)
+	if err := VerifySignature(storedCred.CredentialPublicKey(), bincat, sig); err != nil {
+		return nil, ErrVerifyAuthentication.Wrap(err)
 	}
 
 	//17. If the signature counter value authData.signCount is nonzero or the
@@ -166,10 +166,10 @@ func FinishAuthentication(
 	//If the signature counter value authData.signCount is:
 	//greater than the signature counter value stored in conjunction with
 	//credential’s id attribute.
-	if uint(authData.SignCount) >= storedCred.SignCount() {
+	if uint(authData.SignCount) >= storedCred.CredentialSignCount() {
 		// Update the stored signature counter value, associated with
 		//credential’s id attribute, to be the value of authData.signCount.
-		return uint(authData.SignCount), nil
+		return authData, nil
 	}
 	//less than or equal to the signature counter value stored in
 	//conjunction with credential’s id attribute.
@@ -179,7 +179,7 @@ func FinishAuthentication(
 	//their risk scoring. Whether the Relying Party updates the stored
 	//signature counter value in this case, or not, or fails the
 	//authentication ceremony or not, is Relying Party-specific.
-	return 0, ErrVerifyAuthentication.Wrap(NewError("Credential counter less than stored counter"))
+	return nil, ErrVerifyAuthentication.Wrap(NewError("Credential counter less than stored counter"))
 }
 
 func checkAllowedCredentials(allowed []PublicKeyCredentialDescriptor, id []byte) error {
@@ -202,7 +202,7 @@ func getUserVerifiedCredential(userFinder UserFinder, cred *AssertionPublicKeyCr
 
 	storedCred, ok := user.Credentials()[cred.ID]
 	if !ok {
-		return nil, NewError("User %s does not own this credential", user.Name())
+		return nil, NewError("User %s does not own this credential", user.EntityName())
 	}
 	return storedCred, nil
 }

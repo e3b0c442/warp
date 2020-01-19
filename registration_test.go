@@ -17,15 +17,15 @@ type testRP struct {
 	origin string
 }
 
-func (rp *testRP) ID() string {
+func (rp *testRP) EntityID() string {
 	return rp.id
 }
 
-func (rp *testRP) Name() string {
+func (rp *testRP) EntityName() string {
 	return rp.name
 }
 
-func (rp *testRP) Icon() string {
+func (rp *testRP) EntityIcon() string {
 	return rp.icon
 }
 
@@ -41,19 +41,19 @@ type testUser struct {
 	credentials map[string]Credential
 }
 
-func (u *testUser) Name() string {
+func (u *testUser) EntityName() string {
 	return u.name
 }
 
-func (u *testUser) Icon() string {
+func (u *testUser) EntityIcon() string {
 	return u.icon
 }
 
-func (u *testUser) ID() []byte {
+func (u *testUser) EntityID() []byte {
 	return u.id
 }
 
-func (u *testUser) DisplayName() string {
+func (u *testUser) EntityDisplayName() string {
 	return u.displayName
 }
 
@@ -62,25 +62,25 @@ func (u *testUser) Credentials() map[string]Credential {
 }
 
 type testCred struct {
-	user      User
-	id        string
+	owner     User
+	id        []byte
 	publicKey []byte
 	signCount uint
 }
 
-func (c *testCred) User() User {
-	return c.user
+func (c *testCred) Owner() User {
+	return c.owner
 }
 
-func (c *testCred) ID() string {
+func (c *testCred) CredentialID() []byte {
 	return c.id
 }
 
-func (c *testCred) PublicKey() []byte {
+func (c *testCred) CredentialPublicKey() []byte {
 	return c.publicKey
 }
 
-func (c *testCred) SignCount() uint {
+func (c *testCred) CredentialSignCount() uint {
 	return c.signCount
 }
 
@@ -89,35 +89,6 @@ var mockRP *testRP = &testRP{
 	name:   "e3b0c442.io",
 	icon:   "",
 	origin: "https://e3b0c442.io",
-}
-
-var mockCredentialID string = "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
-
-var mockCredential *testCred = &testCred{
-	user:      &testUser{},
-	id:        mockCredentialID,
-	publicKey: []byte(cborPublicKey),
-	signCount: 0,
-}
-
-var mockUser *testUser = &testUser{
-	name: "jsmith",
-	icon: "",
-	id: []byte{
-		0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14,
-		0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
-		0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c,
-		0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55,
-	},
-	displayName: "John Smith",
-	credentials: map[string]Credential{
-		mockCredentialID: &testCred{
-			user:      nil,
-			id:        mockCredentialID,
-			publicKey: []byte(cborPublicKey),
-			signCount: 0,
-		},
-	},
 }
 
 var mockCreateClientDataJSON []byte = []byte(`{"type":"webauthn.create","challenge":"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU","origin":"https://e3b0c442.io"}`)
@@ -197,97 +168,6 @@ var mockPublicKeyCredentialCreationOptions = &PublicKeyCredentialCreationOptions
 	},
 }
 
-var mockRawAuthData []byte = []byte{
-	0xd8, 0x33, 0x51, 0x40, 0x80, 0xa0, 0xc7, 0x2b, //authdata.rpIDHash
-	0x1e, 0xfa, 0x42, 0xb1, 0x8c, 0x96, 0xb9, 0x27, // |
-	0x3e, 0x9f, 0x19, 0x3f, 0xa9, 0x80, 0xdb, 0x09, // |
-	0xa0, 0x93, 0x33, 0x86, 0x5c, 0x2b, 0x32, 0xf3, // v
-	0x41,                   // authData.Flags
-	0x00, 0x00, 0x00, 0x01, // authData.SignCount
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // authData.attestedCredentialData.aaguid
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // v
-	0x00, 0x20, // authData.attestedCredentialData.credentialIDLength = 32
-	0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, // authData.attestedCredentialData.credentialID
-	0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, // |
-	0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, // |
-	0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55, // v
-	0xa5, // map of 5 items
-	0x1,  // key 1 (Kty)
-	0x2,  // 2 (EC2 key)
-	0x3,  // key 3 (Alg)
-	0x26, // -7
-	0x20, // key -1
-	0x1,  // 1 (P256 Curve)
-	0x21, // key -2
-	0x58, // byte string, >24 bytes
-	0x20, // 32 bytes length
-	0x36, 0xc4, 0x85, 0xf8, 0x83, 0xda, 0xcf, 0xb3,
-	0x63, 0xc8, 0xf6, 0x4d, 0x6a, 0x82, 0xe5, 0x65,
-	0x3d, 0x7d, 0x36, 0x64, 0x2b, 0x3a, 0x10, 0x8b,
-	0x51, 0x55, 0x5a, 0x8d, 0x33, 0x40, 0x7d, 0x5c,
-	0x22, // key -3
-	0x58, // byte string, >24 bytes
-	0x20, // 32 bytes length
-	0x69, 0xc9, 0x52, 0x21, 0x4f, 0xce, 0x43, 0xea,
-	0x5f, 0x80, 0x43, 0x10, 0xbb, 0xe6, 0x3e, 0xd,
-	0xee, 0xcb, 0xf1, 0xe9, 0xba, 0x69, 0x5d, 0xac,
-	0x77, 0x53, 0xb1, 0x31, 0xbc, 0xbf, 0xf3, 0x98,
-}
-
-var mockAttestationObject AttestationObject = AttestationObject{
-	AuthData: mockRawAuthData,
-	Fmt:      AttestationFormatNone,
-	AttStmt:  cbor.RawMessage{0xa0},
-}
-
-var mockRawAttestationObject cbor.RawMessage = cbor.RawMessage{
-	0xa3,             // map, 3 items
-	0x63,             // text string, 3 chars
-	0x66, 0x6d, 0x74, // "fmt"
-	0x64,                   // text string, 4 chars
-	0x6e, 0x6f, 0x6e, 0x65, // "none"
-	0x67,                                     // text string, 7 chars
-	0x61, 0x74, 0x74, 0x53, 0x74, 0x6d, 0x74, // "attStmt"
-	0xa0,                                           // null
-	0x68,                                           // text string, 8 chars
-	0x61, 0x75, 0x74, 0x68, 0x44, 0x61, 0x74, 0x61, // "authData"
-	0x58, 0xa4, // byte string, 164 chars
-	0xd8, 0x33, 0x51, 0x40, 0x80, 0xa0, 0xc7, 0x2b, //authdata.rpIDHash
-	0x1e, 0xfa, 0x42, 0xb1, 0x8c, 0x96, 0xb9, 0x27, // |
-	0x3e, 0x9f, 0x19, 0x3f, 0xa9, 0x80, 0xdb, 0x09, // |
-	0xa0, 0x93, 0x33, 0x86, 0x5c, 0x2b, 0x32, 0xf3, // v
-	0x41,                   // authData.Flags
-	0x00, 0x00, 0x00, 0x01, // authData.SignCount
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // authData.attestedCredentialData.aaguid
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // v
-	0x00, 0x20, // authData.attestedCredentialData.credentialIDLength = 32
-	0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, // authData.attestedCredentialData.credentialID
-	0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, // |
-	0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, // |
-	0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55, // v
-	0xa5, // map of 5 items
-	0x1,  // key 1 (Kty)
-	0x2,  // 2 (EC2 key)
-	0x3,  // key 3 (Alg)
-	0x26, // -7
-	0x20, // key -1
-	0x1,  // 1 (P256 Curve)
-	0x21, // key -2
-	0x58, // byte string, >24 bytes
-	0x20, // 32 bytes length
-	0x36, 0xc4, 0x85, 0xf8, 0x83, 0xda, 0xcf, 0xb3,
-	0x63, 0xc8, 0xf6, 0x4d, 0x6a, 0x82, 0xe5, 0x65,
-	0x3d, 0x7d, 0x36, 0x64, 0x2b, 0x3a, 0x10, 0x8b,
-	0x51, 0x55, 0x5a, 0x8d, 0x33, 0x40, 0x7d, 0x5c,
-	0x22, // key -3
-	0x58, // byte string, >24 bytes
-	0x20, // 32 bytes length
-	0x69, 0xc9, 0x52, 0x21, 0x4f, 0xce, 0x43, 0xea,
-	0x5f, 0x80, 0x43, 0x10, 0xbb, 0xe6, 0x3e, 0xd,
-	0xee, 0xcb, 0xf1, 0xe9, 0xba, 0x69, 0x5d, 0xac,
-	0x77, 0x53, 0xb1, 0x31, 0xbc, 0xbf, 0xf3, 0x98,
-}
-
 type predictableReader struct{}
 
 func (predictableReader) Read(p []byte) (n int, err error) {
@@ -352,13 +232,14 @@ func errorOption() Option {
 	}
 }
 
-func errorCredFinder(_ string) (Credential, error) {
+func errorCredFinder(_ []byte) (Credential, error) {
 	return nil, NewError("Not found")
 }
 
-func foundCredFinder(id string) (Credential, error) {
+func foundCredFinder(id []byte) (Credential, error) {
+
 	return &testCred{
-		user:      mockUser,
+		owner:     mockUser,
 		id:        id,
 		publicKey: []byte{},
 		signCount: 0,
@@ -582,7 +463,7 @@ func TestDecodeAttestationObject(t *testing.T) {
 	type decodeTest struct {
 		Name     string
 		Cred     *AttestationPublicKeyCredential
-		AuthData []byte
+		AuthData AuthenticatorData
 		Fmt      AttestationStatementFormat
 		AttStmt  cbor.RawMessage
 		Err      bool
@@ -605,7 +486,7 @@ func TestDecodeAttestationObject(t *testing.T) {
 					AttestationObject: mockRawAttestationObject,
 				},
 			},
-			AuthData: mockRawAuthData,
+			AuthData: mockAuthData,
 			Fmt:      AttestationFormatNone,
 			AttStmt:  []byte{0xa0},
 		},
@@ -614,7 +495,7 @@ func TestDecodeAttestationObject(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.Name, func(tt *testing.T) {
 
-			authData, fmt, attStmt, err := decodeAttestationObject(test.Cred)
+			attestation, err := decodeAttestationObject(test.Cred)
 			if err != nil {
 				if test.Err {
 					return
@@ -624,14 +505,14 @@ func TestDecodeAttestationObject(t *testing.T) {
 			if test.Err {
 				tt.Fatalf("Did not get expected error")
 			}
-			if !bytes.Equal(authData, test.AuthData) {
-				tt.Fatalf("AuthData mismatch got %#v expected %#v", authData, test.AuthData)
+			if !reflect.DeepEqual(attestation.AuthData, test.AuthData) {
+				tt.Fatalf("AuthData mismatch got %#v expected %#v", attestation.AuthData, test.AuthData)
 			}
-			if fmt != test.Fmt {
-				tt.Fatalf("Fmt mismatch got %s expected %s", fmt, test.Fmt)
+			if attestation.Fmt != test.Fmt {
+				tt.Fatalf("Fmt mismatch got %s expected %s", attestation.Fmt, test.Fmt)
 			}
-			if !bytes.Equal(attStmt, test.AttStmt) {
-				tt.Fatalf("AttStmt mismatch got %#v expected %#v", attStmt, test.AttStmt)
+			if !bytes.Equal(attestation.AttStmt, test.AttStmt) {
+				tt.Fatalf("AttStmt mismatch got %#v expected %#v", attestation.AttStmt, test.AttStmt)
 			}
 		})
 	}
@@ -639,31 +520,33 @@ func TestDecodeAttestationObject(t *testing.T) {
 
 func TestVerifyAttestationStatement(t *testing.T) {
 	type verifyTest struct {
-		Name       string
-		Fmt        AttestationStatementFormat
-		AttStmt    cbor.RawMessage
-		AuthData   []byte
-		ClientData [32]byte
-		Err        error
+		Name           string
+		Attestation    *AttestationObject
+		ClientDataHash [32]byte
+		Err            error
 	}
 
 	tests := []verifyTest{
 		{
 			Name: "bad",
-			Fmt:  "wrong",
-			Err:  ErrVerifyAttestation,
+			Attestation: &AttestationObject{
+				Fmt: "wrong",
+			},
+			Err: ErrVerifyAttestation,
 		},
 		{
-			Name:     "good none",
-			Fmt:      "none",
-			AttStmt:  cbor.RawMessage{0xa0},
-			AuthData: mockRawAuthData,
+			Name: "good none",
+			Attestation: &AttestationObject{
+				Fmt:      "none",
+				AttStmt:  cbor.RawMessage{0xa0},
+				AuthData: mockAuthData,
+			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.Name, func(tt *testing.T) {
-			err := verifyAttestationStatement(test.Fmt, test.AttStmt, test.AuthData, test.ClientData)
+			err := verifyAttestationStatement(test.Attestation, test.ClientDataHash)
 			if err != nil {
 				if errors.Is(err, test.Err) {
 					return
@@ -1109,7 +992,7 @@ func TestFinishRegistration(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(tt *testing.T) {
-			id, key, err := FinishRegistration(test.RP, test.CredFinder, test.Opts, test.Cred)
+			att, err := FinishRegistration(test.RP, test.CredFinder, test.Opts, test.Cred)
 			if err != nil {
 				if errors.Is(err, test.Err) {
 					for err != nil {
@@ -1123,26 +1006,14 @@ func TestFinishRegistration(t *testing.T) {
 			if test.Err != nil {
 				tt.Fatal("Did not receive expected error")
 			}
-			if id != test.Cred.ID {
-				tt.Fatal("ID doesn't match credential ID")
-			}
-			attObj := AttestationObject{}
-			err = cbor.Unmarshal(test.Cred.Response.AttestationObject, &attObj)
+
+			passedAttObj := AttestationObject{}
+			err = passedAttObj.UnmarshalBinary(test.Cred.Response.AttestationObject)
 			if err != nil {
 				tt.Fatal("Unable to parse passed attestation object")
 			}
-			authData := AuthenticatorData{}
-			err = authData.Decode(bytes.NewBuffer(attObj.AuthData))
-			if err != nil {
-				tt.Fatalf("Unable to parse passed authenticator data: %v", err)
-			}
-			k := COSEKey{}
-			err = cbor.Unmarshal(key, &k)
-			if err != nil {
-				tt.Fatalf("Unable to unmarshal returned key")
-			}
-			if !reflect.DeepEqual(k, authData.AttestedCredentialData.CredentialPublicKey) {
-				tt.Fatalf("Keys do not match")
+			if !reflect.DeepEqual(&passedAttObj, att) {
+				tt.Fatalf("Output mismatch, got %#v expected %#v", *att, passedAttObj)
 			}
 
 		})

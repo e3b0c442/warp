@@ -44,9 +44,9 @@ WebAuthn relying parties have two responsibilities: managing the _registration c
 
 ```go
 type RelyingParty interface {
-	ID() string
-	Name() string
-	Icon() string
+	EntityID() string
+	EntityName() string
+	EntityIcon() string
 	Origin() string
 }
 ```
@@ -54,46 +54,46 @@ type RelyingParty interface {
 `RelyingParty` contains all of the non-user-specific data required to be stored
 or configured by the relying party for use during the registration or
 authentication ceremonies.
-* `ID() string`: Returns the Relying Party ID, which scopes the credential. Credentials can only be used for authentication with the same entity (identified by RP ID) it was registered with. The RP ID must be equal to or a registrable domain suffix of the origin.
-* `Name() string`: A human-palatable name for the Relying Party.
-* `Icon() string`: A URL which resolves an image associated with the Relying Party. May be the empty string.
+* `EntityID() string`: Returns the Relying Party ID, which scopes the credential. Credentials can only be used for authentication with the same entity (identified by RP ID) it was registered with. The RP ID must be equal to or a registrable domain suffix of the origin.
+* `EntityName() string`: A human-palatable name for the Relying Party.
+* `EntityIcon() string`: A URL which resolves an image associated with the Relying Party. May be the empty string.
 * `Origin() string`: The fully qualified origin of the Relying Party.
 
 #### `User`
 
 ```go
 type User interface {
-	Name() string
-	Icon() string
-	ID() []byte
-	DisplayName() string
+	EntityName() string
+	EntityIcon() string
+	EntityID() []byte
+	EntityDisplayName() string
 	Credentials() map[string]Credential
 }
 ```
 
 `User` contains all of the user-specific information which needs to be stored and provided during the registration and authentication ceremonies.
-* `Name() string`: A human-palatable name for a user account, such as a username or email address
-* `Icon() string`: A URL which resolves to an image associated with the user. May be the empty string.
-* `ID() string`: The user handle for the account. This should be an opaque byte sequence with a maximum of 64 bytes which does not contain any other identifying information about the user.
-* `DisplayName() string`: A human-palatable name for a user account, such as a user's full name, intended for display. 
+* `EntityName() string`: A human-palatable name for a user account, such as a username or email address
+* `EntityIcon() string`: A URL which resolves to an image associated with the user. May be the empty string.
+* `EntityID() string`: The user handle for the account. This should be an opaque byte sequence with a maximum of 64 bytes which does not contain any other identifying information about the user.
+* `EntityDisplayName() string`: A human-palatable name for a user account, such as a user's full name, intended for display. 
 * `Credentials() map[string]Credential` returns a map of objects which implement the `Credential` interface. The map is keyed by the base64url-encoded form of the credential ID.
 
 #### `Credential`
 
 ```go
 type Credential interface {
-	User() User
-	ID() string
-	PublicKey() []byte
-	SignCount() uint
+	Owner() User
+	CredentialID() []byte
+	CredentialPublicKey() []byte
+	CredentialSignCount() uint
 }
 ```
 
 `Credential` contains the credential-specific information which needs to be stored and provided during the authentication ceremony to verify an authentication assertion.
-* `User() User`: Returns the object implementing the `User` interface to which this credential belongs.
-* `ID() string`: The base64url-encoded credential ID.
-* `PublicKey() []byte`: The credential public key as returned from `FinishRegistration`. The key is encoded in the COSE key format, and may vary in size depending on the key algorithm.
-* `SignCount() uint`: The stored signature counter. If the credential returns a signature counter that is less than this value, it is evidence of tampering or a duplicated credential, and the authentication ceremony will fail. If you do not wish to verify this, return `0` from this method.
+* `Owner() User`: Returns the object implementing the `User` interface to which this credential belongs.
+* `CredentialID() []byte`: The raw credential ID.
+* `CredentialPublicKey() []byte`: The credential public key as returned from `FinishRegistration`. The key is encoded in the COSE key format, and may vary in size depending on the key algorithm.
+* `CredentialSignCount() uint`: The stored signature counter. If the credential returns a signature counter that is less than this value, it is evidence of tampering or a duplicated credential, and the authentication ceremony will fail. If you do not wish to verify this, return `0` from this method.
 
 ### Helper functions
 
@@ -108,9 +108,9 @@ type UserFinder func([]byte) (User, error)
 #### `CredentialFinder`
 
 ```go
-type CredentialFinder func(string) (Credential, error)
+type CredentialFinder func([]byte) (Credential, error)
 ```
-`CredentialFinder` defines a function which takes a base64url-encoded credential ID and returns an object conforming to the Credential interface. If the credential does not exist in the system, return `nil` and an appropriate error.
+`CredentialFinder` defines a function which takes a raw credential ID and returns an object conforming to the Credential interface. If the credential does not exist in the system, return `nil` and an appropriate error.
 
 
 ### Registration:
@@ -143,7 +143,7 @@ The returned object or its data must be stored in the server-side session cache 
 #### `FinishRegistration`
 
 ```go
-func FinishRegistration(rp RelyingParty, credFinder CredentialFinder, opts *PublicKeyCredentialCreationOptions, cred *AttestationPublicKeyCredential) (string, []byte, error)
+func FinishRegistration(rp RelyingParty, credFinder CredentialFinder, opts *PublicKeyCredentialCreationOptions, cred *AttestationPublicKeyCredential) (*AttestationObject, error)
 ```
 
 `FinishRegistration` completes the registration ceremony, by verifying the public key credential sent by the client against the stored creation options. If the verification is successful, a credential ID and public key are returned which must be stored. It is the responsibility of the implementor to store these and associate with the calling user.
@@ -155,8 +155,7 @@ func FinishRegistration(rp RelyingParty, credFinder CredentialFinder, opts *Publ
 * `cred`: The parsed `AttestationPublicKeyCredential` that was sent from the client in response to the server challenge
 
 ##### Return values:
-* A string containing the base64url-encoded credential ID, or an empty string on error
-* A byte slice containing the credential's public key in COSE key format, or `nil` on error
+* An `*AttestationObject` which contains all of the information that may need to be stored to authenticate using the credential
 * An error identifying the cause of the registration failure, or `nil` on success.
 
 ### Authentication
@@ -184,7 +183,7 @@ func StartAuthentication(opts ...Option) (*PublicKeyCredentialRequestOptions, er
 #### FinishAuthentication
 
 ```go
-func FinishAuthentication(rp RelyingParty, userFinder UserFinder, opts *PublicKeyCredentialRequestOptions, cred *AssertionPublicKeyCredential) (uint, error)
+func FinishAuthentication(rp RelyingParty, userFinder UserFinder, opts *PublicKeyCredentialRequestOptions, cred *AssertionPublicKeyCredential) (*AuthenticatorData, error)
 ```
 
 `FinishAuthentication` completes the authentication ceremony by verifying the signed challenge and credential data with the stored public key for the credential. If the verification is successful, it returns a new signature counter value to be stored, and a `nil` error. Otherwise, 0 and an error describing the failure are returned. It is the responsibility of the caller to store the updated signature counter if they are choosing to verify this.
@@ -196,7 +195,7 @@ func FinishAuthentication(rp RelyingParty, userFinder UserFinder, opts *PublicKe
 * `cred`: The parsed `AssertionPublicKeyCredential` that was sent from the client in response to the server challenge.
 
 ##### Return values:
-* An unsigned int which is the new signature counter returned by the authenticator. This value should be stored with the credential.
+* An `*AuthenticatorData` which contains information about the credential used to authenticate; may be used to update stored credential data such as sign count.
 * An error if there was a problem verifying the user, or `nil` on success
 
 # License

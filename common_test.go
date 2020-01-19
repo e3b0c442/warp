@@ -259,15 +259,15 @@ type rpTest struct {
 	origin string
 }
 
-func (rp *rpTest) ID() string {
+func (rp *rpTest) EntityID() string {
 	return rp.id
 }
 
-func (rp *rpTest) Name() string {
+func (rp *rpTest) EntityName() string {
 	return rp.name
 }
 
-func (rp *rpTest) Icon() string {
+func (rp *rpTest) EntityIcon() string {
 	return rp.icon
 }
 
