@@ -43,9 +43,13 @@ var (
 	ErrDecodeAttestedCredentialData = Error{err: "Error decoding attested credential data"}
 	ErrDecodeAuthenticatorData      = Error{err: "Error decoding authenticator data"}
 	ErrDecodeCOSEKey                = Error{err: "Error decoding raw public key"}
+	ErrEncodeAttestedCredentialData = Error{err: "Error encoding attested credential data"}
+	ErrEncodeAuthenticatorData      = Error{err: "Error encoding authenticator data"}
 	ErrGenerateChallenge            = Error{err: "Error generating challenge"}
+	ErrMarshalAttestationObject     = Error{err: "Error marshaling attestation object"}
 	ErrOption                       = Error{err: "Option error"}
 	ErrNotImplemented               = Error{err: "Not implemented"}
+	ErrUnmarshalAttestationObject   = Error{err: "Error unmarshaling attestation object"}
 	ErrVerifyAttestation            = Error{err: "Error verifying attestation"}
 	ErrVerifyAuthentication         = Error{err: "Error verifying authentication"}
 	ErrVerifyClientExtensionOutput  = Error{err: "Error verifying client extension output"}

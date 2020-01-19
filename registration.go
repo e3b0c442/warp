@@ -2,10 +2,7 @@ package warp
 
 import (
 	"crypto/sha256"
-	"encoding/base64"
 	"errors"
-
-	"github.com/fxamacker/cbor"
 )
 
 //StartRegistration starts the registration ceremony by creating a credential
@@ -20,19 +17,19 @@ func StartRegistration(
 ) {
 	rpEntity := PublicKeyCredentialRPEntity{
 		PublicKeyCredentialEntity: PublicKeyCredentialEntity{
-			Name: rp.Name(),
-			Icon: rp.Icon(),
+			Name: rp.EntityName(),
+			Icon: rp.EntityIcon(),
 		},
-		ID: rp.ID(),
+		ID: rp.EntityID(),
 	}
 
 	userEntity := PublicKeyCredentialUserEntity{
 		PublicKeyCredentialEntity: PublicKeyCredentialEntity{
-			Name: user.Name(),
-			Icon: user.Icon(),
+			Name: user.EntityName(),
+			Icon: user.EntityIcon(),
 		},
-		ID:          user.ID(),
-		DisplayName: user.DisplayName(),
+		ID:          user.EntityID(),
+		DisplayName: user.EntityDisplayName(),
 	}
 
 	challenge, err := generateChallenge()
@@ -76,16 +73,15 @@ func SupportedPublicKeyCredentialParameters() []PublicKeyCredentialParameters {
 }
 
 //FinishRegistration completes the registration ceremony by validating the
-//provided public key credential, and returns the credential elements that need
-//to be stored.
+//provided public key credential, and returns the attestation object containing
+//all authenticator data that should be stored.
 func FinishRegistration(
 	rp RelyingParty,
 	credFinder CredentialFinder,
 	opts *PublicKeyCredentialCreationOptions,
 	cred *AttestationPublicKeyCredential,
 ) (
-	string,
-	[]byte,
+	*AttestationObject,
 	error,
 ) {
 	//1. Let JSONtext be the result of running UTF-8 decode on the value of
@@ -98,23 +94,23 @@ func FinishRegistration(
 	//on JSONtext.
 	C, err := parseClientData(cred.Response.ClientDataJSON)
 	if err != nil {
-		return "", nil, ErrVerifyRegistration.Wrap(err)
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//3. Verify that the value of C.type is webauthn.create.
 	if C.Type != "webauthn.create" {
-		return "", nil, ErrVerifyRegistration.Wrap(NewError("C.type is not webauthn.create"))
+		return nil, ErrVerifyRegistration.Wrap(NewError("C.type is not webauthn.create"))
 	}
 
 	//4. Verify that the value of C.challenge matches the challenge that was
 	//sent to the authenticator in the create() call.
 	if err = verifyChallenge(C, opts.Challenge); err != nil {
-		return "", nil, ErrVerifyRegistration.Wrap(err)
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//5. Verify that the value of C.origin matches the Relying Party's origin.
 	if err = verifyOrigin(C, rp); err != nil {
-		return "", nil, ErrVerifyRegistration.Wrap(err)
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//6. Verify that the value of C.tokenBinding.status matches the state of
@@ -123,7 +119,7 @@ func FinishRegistration(
 	//that C.tokenBinding.id matches the base64url encoding of the Token Binding
 	//ID for the connection.
 	if err = verifyTokenBinding(C); err != nil {
-		return "", nil, ErrVerifyRegistration.Wrap(err)
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//7. Compute the hash of response.clientDataJSON using SHA-256.
@@ -133,32 +129,28 @@ func FinishRegistration(
 	//AuthenticatorAttestationResponse structure to obtain the attestation
 	//statement format fmt, the authenticator data authData, and the attestation
 	//statement attStmt.
-	rawAuthData, attStmtFmt, attStmt, err := decodeAttestationObject(cred)
+	attestation, err := decodeAttestationObject(cred)
 	if err != nil {
-		return "", nil, ErrVerifyRegistration.Wrap(err)
-	}
-	authData, err := decodeAuthData(rawAuthData)
-	if err != nil {
-		return "", nil, ErrVerifyRegistration.Wrap(err)
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//9. Verify that the rpIdHash in authData is the SHA-256 hash of the RP ID
 	//expected by the Relying Party.
-	if err := verifyRPIDHash(rp.ID(), authData); err != nil {
-		return "", nil, ErrVerifyRegistration.Wrap(err)
+	if err := verifyRPIDHash(rp.EntityID(), &attestation.AuthData); err != nil {
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//10. Verify that the User Present bit of the flags in authData is set.
-	if err := verifyUserPresent(authData); err != nil {
-		return "", nil, ErrVerifyRegistration.Wrap(err)
+	if err := verifyUserPresent(&attestation.AuthData); err != nil {
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//11. If user verification is required for this registration, verify that
 	//the User Verified bit of the flags in authData is set.
 	if opts.AuthenticatorSelection != nil &&
 		opts.AuthenticatorSelection.UserVerification == VerificationRequired {
-		if err = verifyUserVerified(authData); err != nil {
-			return "", nil, ErrVerifyRegistration.Wrap(err)
+		if err = verifyUserVerified(&attestation.AuthData); err != nil {
+			return nil, ErrVerifyRegistration.Wrap(err)
 		}
 	}
 
@@ -173,7 +165,7 @@ func FinishRegistration(
 	//general case, the meaning of "are as expected" is specific to the Relying
 	//Party and which extensions are in use.
 	if err := verifyClientExtensionsOutputs(opts.Extensions, cred.Extensions); err != nil {
-		return "", nil, ErrVerifyRegistration.Wrap(err)
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//13. Determine the attestation statement format by performing a USASCII
@@ -181,16 +173,16 @@ func FinishRegistration(
 	//Attestation Statement Format Identifier values. An up-to-date list of
 	//registered WebAuthn Attestation Statement Format Identifier values is
 	//maintained in the IANA registry of the same name [WebAuthn-Registries].
-	if err := attStmtFmt.Valid(); err != nil {
-		return "", nil, ErrVerifyRegistration.Wrap(err)
+	if err := attestation.Fmt.Valid(); err != nil {
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//14. Verify that attStmt is a correct attestation statement, conveying a
 	//valid attestation signature, by using the attestation statement format
 	//fmt’s verification procedure given attStmt, authData and the hash of the
 	//serialized client data computed in step 7.
-	if err := verifyAttestationStatement(attStmtFmt, attStmt, rawAuthData, clientDataHash); err != nil {
-		return "", nil, ErrVerifyRegistration.Wrap(err)
+	if err := verifyAttestationStatement(attestation, clientDataHash); err != nil {
+		return nil, ErrVerifyRegistration.Wrap(err)
 	}
 
 	//15. If validation is successful, obtain a list of acceptable trust anchors
@@ -209,8 +201,8 @@ func FinishRegistration(
 	//ceremony, or it MAY decide to accept the registration, e.g. while deleting
 	//the older registration.
 	//TODO implement optional deletion
-	if _, err := credFinder(base64.RawURLEncoding.EncodeToString(authData.AttestedCredentialData.CredentialID)); err == nil {
-		return "", nil, ErrVerifyRegistration.Wrap(NewError("Credential with this ID already exists"))
+	if _, err := credFinder(attestation.AuthData.AttestedCredentialData.CredentialID); err == nil {
+		return nil, ErrVerifyRegistration.Wrap(NewError("Credential with this ID already exists"))
 	}
 
 	//18. If the attestation statement attStmt verified successfully and is
@@ -219,32 +211,30 @@ func FinishRegistration(
 	//with the credentialId and credentialPublicKey in the
 	//attestedCredentialData in authData, as appropriate for the Relying Party's
 	//system.
-	rawKey, _ := cbor.Marshal(authData.AttestedCredentialData.CredentialPublicKey, cbor.EncOptions{
-		Sort: cbor.SortCTAP2,
-	}) // ignore error because we just unmarshaled the key
-
-	return cred.ID, rawKey, nil
+	return attestation, nil
 }
 
-func decodeAttestationObject(cred *AttestationPublicKeyCredential) ([]byte, AttestationStatementFormat, cbor.RawMessage, error) {
-	attestationObj := AttestationObject{}
-	err := cbor.Unmarshal(cred.Response.AttestationObject, &attestationObj)
+func decodeAttestationObject(cred *AttestationPublicKeyCredential) (*AttestationObject, error) {
+	attestation := AttestationObject{}
+	err := attestation.UnmarshalBinary(cred.Response.AttestationObject)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, err
 	}
 
-	return attestationObj.AuthData, attestationObj.Fmt, attestationObj.AttStmt, nil
+	return &attestation, nil
 }
 
 func verifyAttestationStatement(
-	fmt AttestationStatementFormat,
-	attStmt cbor.RawMessage,
-	authData []byte,
-	clientData [32]byte,
+	attestation *AttestationObject,
+	clientDataHash [32]byte,
 ) error {
-	switch fmt {
+	rawAuthData, err := attestation.AuthData.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	switch attestation.Fmt {
 	case AttestationFormatNone:
-		return VerifyNoneAttestationStatement(attStmt, authData, clientData)
+		return VerifyNoneAttestationStatement(attestation.AttStmt, rawAuthData, clientDataHash)
 	}
 
 	return ErrVerifyAttestation.Wrap(errors.New("Unsupported attestation format"))

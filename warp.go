@@ -3,10 +3,10 @@ package warp
 //User defines functions which return data required about the authenticating
 //user in order to perform WebAuthn transactions.
 type User interface {
-	Name() string
-	Icon() string
-	ID() []byte
-	DisplayName() string
+	EntityName() string
+	EntityIcon() string
+	EntityID() []byte
+	EntityDisplayName() string
 	Credentials() map[string]Credential
 }
 
@@ -17,22 +17,22 @@ type UserFinder func([]byte) (User, error)
 //Credential defines functions which return data required about the stored
 //credentials
 type Credential interface {
-	User() User
-	ID() string
-	PublicKey() []byte
-	SignCount() uint
+	Owner() User
+	CredentialSignCount() uint
+	CredentialID() []byte
+	CredentialPublicKey() []byte
 }
 
 //CredentialFinder defines a function which takes a credential ID as a parameter
 //and returns an object which implements the Credential interface and an error
-type CredentialFinder func(string) (Credential, error)
+type CredentialFinder func([]byte) (Credential, error)
 
 //RelyingParty defines functions which return data required about the Relying
 //Party in order to perform WebAuthn transactions.
 type RelyingParty interface {
-	ID() string
-	Name() string
-	Icon() string
+	EntityID() string
+	EntityName() string
+	EntityIcon() string
 	Origin() string
 }
 

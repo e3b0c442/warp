@@ -609,8 +609,8 @@ func TestFinishAuthentication(t *testing.T) {
 				displayName: "John Smith",
 				credentials: map[string]Credential{
 					mockCredentialID: &testCred{
-						user:      nil,
-						id:        mockCredentialID,
+						owner:     nil,
+						id:        mockRawCredentialID,
 						publicKey: []byte(cborPublicKey),
 						signCount: 2,
 					},

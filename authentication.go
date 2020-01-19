@@ -156,7 +156,7 @@ func FinishAuthentication(
 	bincat := make([]byte, 0, sha256.Size+len(rawAuthData))
 	bincat = append(bincat, rawAuthData...)
 	bincat = append(bincat, hash[:]...)
-	if err := VerifySignature(storedCred.PublicKey(), bincat, sig); err != nil {
+	if err := VerifySignature(storedCred.CredentialPublicKey(), bincat, sig); err != nil {
 		return 0, ErrVerifyAuthentication.Wrap(err)
 	}
 
@@ -166,7 +166,7 @@ func FinishAuthentication(
 	//If the signature counter value authData.signCount is:
 	//greater than the signature counter value stored in conjunction with
 	//credential’s id attribute.
-	if uint(authData.SignCount) >= storedCred.SignCount() {
+	if uint(authData.SignCount) >= storedCred.CredentialSignCount() {
 		// Update the stored signature counter value, associated with
 		//credential’s id attribute, to be the value of authData.signCount.
 		return uint(authData.SignCount), nil
@@ -202,7 +202,7 @@ func getUserVerifiedCredential(userFinder UserFinder, cred *AssertionPublicKeyCr
 
 	storedCred, ok := user.Credentials()[cred.ID]
 	if !ok {
-		return nil, NewError("User %s does not own this credential", user.Name())
+		return nil, NewError("User %s does not own this credential", user.EntityName())
 	}
 	return storedCred, nil
 }

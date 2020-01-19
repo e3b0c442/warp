@@ -64,5 +64,5 @@ func EffectiveRPID(rp RelyingParty, in AuthenticationExtensionsClientInputs, out
 		}
 	}
 
-	return rp.ID()
+	return rp.EntityID()
 }

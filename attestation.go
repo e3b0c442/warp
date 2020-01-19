@@ -14,9 +14,49 @@ var idFidoGenCeAaguid asn1.ObjectIdentifier = asn1.ObjectIdentifier([]int{1, 3, 
 //AttestationObject contains both authenticator data and an attestation
 //statement.
 type AttestationObject struct {
+	AuthData AuthenticatorData
+	Fmt      AttestationStatementFormat
+	AttStmt  cbor.RawMessage
+}
+
+type encodingAttObj struct {
 	AuthData []byte                     `cbor:"authData"`
 	Fmt      AttestationStatementFormat `cbor:"fmt"`
 	AttStmt  cbor.RawMessage            `cbor:"attStmt"`
+}
+
+//MarshalBinary implements the BinaryMarshaler interface, and returns the raw
+//CBOR encoding of AttestationObject
+func (ao *AttestationObject) MarshalBinary() (data []byte, err error) {
+	rawAuthData, err := (&ao.AuthData).MarshalBinary()
+	if err != nil {
+		return nil, ErrMarshalAttestationObject.Wrap(err)
+	}
+
+	intermediate := encodingAttObj{
+		AuthData: rawAuthData,
+		Fmt:      ao.Fmt,
+		AttStmt:  ao.AttStmt,
+	}
+
+	return cbor.Marshal(&intermediate, cbor.EncOptions{Sort: cbor.SortCTAP2})
+}
+
+//UnmarshalBinary implements the BinaryUnmarshaler interface, and populates an
+//AttestationObject with the provided raw CBOR
+func (ao *AttestationObject) UnmarshalBinary(data []byte) error {
+	intermediate := encodingAttObj{}
+	if err := cbor.Unmarshal(data, &intermediate); err != nil {
+		return ErrUnmarshalAttestationObject.Wrap(err)
+	}
+
+	if err := (&ao.AuthData).UnmarshalBinary(intermediate.AuthData); err != nil {
+		return ErrUnmarshalAttestationObject.Wrap(err)
+	}
+
+	ao.Fmt = intermediate.Fmt
+	ao.AttStmt = intermediate.AttStmt
+	return nil
 }
 
 //AttestationStatementFormat is the identifier for an attestation statement
