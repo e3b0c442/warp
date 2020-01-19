@@ -397,12 +397,17 @@ func FinishAuthentication(rp RelyingParty, userFinder UserFinder, opts *PublicKe
 ## Contributing
 Please read [CONTRIBUTING.md](https://github.com/e3b0c442/warp/blob/master/CONTRIBUTING.md) for instructions on contributing to the project.
 
+## Contributors
+Thanks to the following who have made contributions to the software or its documentation.
+
+@virtualandy
+
 ## Security vulnerabilities
 Given the impact of the authentication flow on the overall security of a project, security vulnerabilities will be taken extremely seriously.
 
 If you discover a security vulnerability, please send an email to security@e3b0c442.io instead of opening an issue. Security vulnerabilities will be resolved within 14 days whenever feasible and the reporter and issue details will be acknowledged in the changelog once the code resolving the issue is released.
 
 ## License
-Copyright (c) 2020 Nick Meyer.
+Copyright (c) 2020 Nick Meyer and contributors.
 
 This project is released under the [MIT license](https://github.com/e3b0c442/warp/blob/master/LICENSE)
