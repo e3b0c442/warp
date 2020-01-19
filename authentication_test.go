@@ -224,7 +224,7 @@ func TestFinishAuthentication(t *testing.T) {
 		UserFinder UserFinder
 		Opts       *PublicKeyCredentialRequestOptions
 		Cred       *AssertionPublicKeyCredential
-		Expected   uint
+		Expected   *AuthenticatorData
 		Err        error
 	}
 
@@ -672,7 +672,7 @@ func TestFinishAuthentication(t *testing.T) {
 					},
 				},
 			},
-			Expected: 1,
+			Expected: &mockAuthData,
 		},
 	}
 
@@ -692,8 +692,8 @@ func TestFinishAuthentication(t *testing.T) {
 			if test.Err != nil {
 				tt.Fatalf("Did not get expected error")
 			}
-			if out != test.Expected {
-				tt.Fatalf("Unexpected signCount %d", out)
+			if !reflect.DeepEqual(out, test.Expected) {
+				tt.Fatalf("Output mismatch got %#v expected %#v", out, test.Expected)
 			}
 		})
 	}
