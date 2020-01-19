@@ -168,12 +168,6 @@ var mockPublicKeyCredentialCreationOptions = &PublicKeyCredentialCreationOptions
 	},
 }
 
-var mockAttestationObject AttestationObject = AttestationObject{
-	AuthData: mockAuthData,
-	Fmt:      AttestationFormatNone,
-	AttStmt:  cbor.RawMessage{0xa0},
-}
-
 type predictableReader struct{}
 
 func (predictableReader) Read(p []byte) (n int, err error) {

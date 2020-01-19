@@ -28,10 +28,7 @@ type encodingAttObj struct {
 //MarshalBinary implements the BinaryMarshaler interface, and returns the raw
 //CBOR encoding of AttestationObject
 func (ao *AttestationObject) MarshalBinary() (data []byte, err error) {
-	rawAuthData, err := (&ao.AuthData).MarshalBinary()
-	if err != nil {
-		return nil, ErrMarshalAttestationObject.Wrap(err)
-	}
+	rawAuthData, _ := (&ao.AuthData).MarshalBinary() //cannot fail
 
 	intermediate := encodingAttObj{
 		AuthData: rawAuthData,
@@ -39,7 +36,7 @@ func (ao *AttestationObject) MarshalBinary() (data []byte, err error) {
 		AttStmt:  ao.AttStmt,
 	}
 
-	return cbor.Marshal(&intermediate, cbor.EncOptions{Sort: cbor.SortCTAP2})
+	return cbor.Marshal(&intermediate, cbor.CTAP2EncOptions())
 }
 
 //UnmarshalBinary implements the BinaryUnmarshaler interface, and populates an

@@ -24,12 +24,7 @@ type AuthenticatorData struct {
 //binary authData
 func (ad *AuthenticatorData) MarshalBinary() (data []byte, err error) {
 	b := &bytes.Buffer{}
-
-	err = ad.Encode(b)
-	if err != nil {
-		return nil, err
-	}
-
+	ad.Encode(b) //writes to bytes.Buffer cannot fail
 	return b.Bytes(), nil
 }
 
@@ -151,7 +146,7 @@ func (ad *AuthenticatorData) Decode(data io.Reader) error {
 type AttestedCredentialData struct {
 	AAGUID              [16]byte
 	CredentialID        []byte
-	CredentialPublicKey COSEKey
+	CredentialPublicKey cbor.RawMessage
 }
 
 //Decode decodes the attested credential data from a stream

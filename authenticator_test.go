@@ -113,7 +113,7 @@ func TestAuthenticatorDataDecode(t *testing.T) {
 				0x00, 0x10,
 				0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
 				0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf,
-			}, goodP256Raw...)),
+			}, knownP256Raw...)),
 			Expected: &AuthenticatorData{
 				RPIDHash: [32]byte{
 					0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14,
@@ -135,7 +135,7 @@ func TestAuthenticatorDataDecode(t *testing.T) {
 						0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
 						0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf,
 					},
-					CredentialPublicKey: *goodP256COSE,
+					CredentialPublicKey: knownP256Raw,
 				},
 				Extensions: nil,
 			},
@@ -236,7 +236,7 @@ func TestAttestedCredentialDataDecode(t *testing.T) {
 				0x00, 0x10,
 				0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
 				0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf,
-			}, goodP256Raw...)),
+			}, knownP256Raw...)),
 			Expected: &AttestedCredentialData{
 				AAGUID: [16]byte{
 					0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
@@ -246,7 +246,7 @@ func TestAttestedCredentialDataDecode(t *testing.T) {
 					0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
 					0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf,
 				},
-				CredentialPublicKey: *goodP256COSE,
+				CredentialPublicKey: knownP256Raw,
 			},
 		},
 	}
@@ -477,5 +477,27 @@ func TestAuthenticatorDataEncode(t *testing.T) {
 				tt.Fatalf("Output mismatch, expected %#v got %#v", test.Expected, b.Bytes())
 			}
 		})
+	}
+}
+
+func TestAuthenticatorDataMarshalBinary(t *testing.T) {
+	data, err := (&mockAuthData).MarshalBinary()
+	if err != nil {
+		t.Fatalf("Got unexpected error %v", err)
+	}
+	if !bytes.Equal(data, mockRawAuthData) {
+		t.Fatalf("Output mismatch got %#v expected %#v", data, mockRawAuthData)
+	}
+}
+
+func TestAuthenticatorDataUnmarshalBinary(t *testing.T) {
+	ad := &AuthenticatorData{}
+	err := ad.UnmarshalBinary(mockRawAuthData)
+
+	if err != nil {
+		t.Fatalf("Got unexpected error %v", err)
+	}
+	if !reflect.DeepEqual(*ad, mockAuthData) {
+		t.Fatalf("Output mismatch got %#v expected %#v", ad, mockAuthData)
 	}
 }

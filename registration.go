@@ -228,10 +228,7 @@ func verifyAttestationStatement(
 	attestation *AttestationObject,
 	clientDataHash [32]byte,
 ) error {
-	rawAuthData, err := attestation.AuthData.MarshalBinary()
-	if err != nil {
-		return err
-	}
+	rawAuthData, _ := attestation.AuthData.MarshalBinary() //cannot fail
 	switch attestation.Fmt {
 	case AttestationFormatNone:
 		return VerifyNoneAttestationStatement(attestation.AttStmt, rawAuthData, clientDataHash)
