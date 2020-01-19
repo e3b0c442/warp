@@ -7,7 +7,7 @@
 [![Release](https://img.shields.io/github/release/e3b0c442/warp.svg?style=flat-square)](https://github.com/e3b0c442/warp/releases)
 ![GitHub](https://img.shields.io/github/license/e3b0c442/warp)
 
-_warp_ is a WebAuthn Relying Party implementation which is intended to be 100% compliant with the [W3C WebAuthn Level 1](https://https://www.w3.org/TR/webauthn-1/) standard while being HTTP implementation agnostic. It is completely standalone; simply provide your own HTTP server, backend storage and
+_warp_ is a WebAuthn Relying Party implementation which is intended to be 100% compliant with the [W3C WebAuthn Level 1](https://www.w3.org/TR/webauthn-1/) standard while being HTTP implementation agnostic. It is completely standalone; simply provide your own HTTP server, backend storage and
 session storage.
 
 _Requires Go 1.13+_
