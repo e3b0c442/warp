@@ -27,15 +27,15 @@ type rp struct {
 	origin string
 }
 
-func (r rp) ID() string {
+func (r rp) EntityID() string {
 	u, _ := url.Parse(r.origin)
 	return u.Hostname()
 }
 
-func (r rp) Name() string {
+func (r rp) EntityName() string {
 	return r.origin
 }
-func (r rp) Icon() string {
+func (r rp) EntityIcon() string {
 	return ""
 }
 func (r rp) Origin() string {
@@ -48,19 +48,19 @@ type user struct {
 	credentials map[string]warp.Credential
 }
 
-func (u *user) ID() []byte {
+func (u *user) EntityID() []byte {
 	return u.id
 }
 
-func (u *user) Name() string {
+func (u *user) EntityName() string {
 	return u.name
 }
 
-func (u *user) DisplayName() string {
+func (u *user) EntityDisplayName() string {
 	return u.name
 }
 
-func (u *user) Icon() string {
+func (u *user) EntityIcon() string {
 	return ""
 }
 
@@ -69,29 +69,30 @@ func (u *user) Credentials() map[string]warp.Credential {
 }
 
 type credential struct {
-	id       string
-	pubkey   []byte
-	username string
+	owner warp.User
+	att   *warp.AttestationObject
 }
 
-func (c *credential) User() warp.User {
-	return users[c.username]
+func (c *credential) Owner() warp.User {
+	return c.owner
 }
 
-func (c *credential) ID() string {
-	return c.id
+func (c *credential) CredentialID() []byte {
+	return c.att.AuthData.AttestedCredentialData.CredentialID
 }
 
-func (c *credential) PublicKey() []byte {
-	return c.pubkey
+func (c *credential) CredentialPublicKey() []byte {
+
+	return c.att.AuthData.AttestedCredentialData.CredentialPublicKey
 }
 
-func (c *credential) SignCount() uint {
+func (c *credential) CredentialSignCount() uint {
 	return 0
 }
 
-func findCredential(id string) (warp.Credential, error) {
-	if c, ok := credentials[id]; ok {
+func findCredential(id []byte) (warp.Credential, error) {
+	strID := base64.RawStdEncoding.EncodeToString(id)
+	if c, ok := credentials[strID]; ok {
 		return c, nil
 	}
 	return nil, fmt.Errorf("No credential")
@@ -223,7 +224,7 @@ func finishRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, pubkey, err := warp.FinishRegistration(relyingParty, findCredential, session.CreationOptions, &cred)
+	att, err := warp.FinishRegistration(relyingParty, findCredential, session.CreationOptions, &cred)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Unauthorized: %v", err), http.StatusUnauthorized)
 		for err != nil {
@@ -234,10 +235,10 @@ func finishRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	toStore := credential{
-		id:       id,
-		pubkey:   pubkey,
-		username: username,
+		att:   att,
+		owner: users[username],
 	}
+	id := base64.RawURLEncoding.EncodeToString(att.AuthData.AttestedCredentialData.CredentialID)
 	credentials[id] = &toStore
 	users[username].(*user).credentials[id] = &toStore
 
@@ -263,15 +264,14 @@ func startAuthentication(w http.ResponseWriter, r *http.Request) {
 		func(user warp.User) []warp.PublicKeyCredentialDescriptor {
 			ds := []warp.PublicKeyCredentialDescriptor{}
 			for _, c := range user.Credentials() {
-				credID, _ := base64.RawURLEncoding.DecodeString(c.ID())
 				ds = append(ds, warp.PublicKeyCredentialDescriptor{
 					Type: "public-key",
-					ID:   credID,
+					ID:   c.CredentialID(),
 				})
 			}
 			return ds
 		}(u)),
-		warp.RelyingPartyID(relyingParty.ID()),
+		warp.RelyingPartyID(relyingParty.EntityID()),
 	)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Start authenticate fail: %v", err), http.StatusInternalServerError)
