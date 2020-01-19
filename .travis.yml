@@ -5,9 +5,13 @@ go:
 
 before_install:
   - go get -t -v ./...
+  - go get -u golang.org/x/lint/golint
+  - go get -u honnef.co/go/tools/cmd/staticcheck
 
 script:
-  - go test -race -coverprofile=coverage.txt -covermode=atomic
+  - golint -set_exit_status ./...
+  - staticcheck ./...
+  - go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)

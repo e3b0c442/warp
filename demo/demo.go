@@ -95,7 +95,7 @@ func findCredential(id []byte) (warp.Credential, error) {
 	if c, ok := credentials[strID]; ok {
 		return c, nil
 	}
-	return nil, fmt.Errorf("No credential")
+	return nil, fmt.Errorf("no credential")
 }
 
 type sessionData struct {
@@ -313,7 +313,7 @@ func finishAuthentication(w http.ResponseWriter, r *http.Request) {
 			if us, ok := users[username]; ok {
 				return us, nil
 			}
-			return nil, fmt.Errorf("User not found")
+			return nil, fmt.Errorf("user not found")
 		},
 		session.RequestOptions,
 		&cred,
