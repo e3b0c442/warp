@@ -234,5 +234,5 @@ func verifyAttestationStatement(
 		return VerifyNoneAttestationStatement(attestation.AttStmt, rawAuthData, clientDataHash)
 	}
 
-	return ErrVerifyAttestation.Wrap(errors.New("Unsupported attestation format"))
+	return ErrVerifyAttestation.Wrap(errors.New("unsupported attestation format"))
 }

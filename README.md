@@ -4,6 +4,7 @@
 [![GoDoc](https://godoc.org/github.com/e3b0c442/warp?status.svg)](https://godoc.org/github.com/e3b0c442/warp)
 [![Go Report Card](https://goreportcard.com/badge/github.com/e3b0c442/warp)](https://goreportcard.com/report/github.com/e3b0c442/warp)
 [![codecov](https://codecov.io/gh/e3b0c442/warp/branch/master/graph/badge.svg)](https://codecov.io/gh/e3b0c442/warp)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3625/badge)](https://bestpractices.coreinfrastructure.org/projects/3625)
 [![Release](https://img.shields.io/github/release/e3b0c442/warp.svg?style=flat-square)](https://github.com/e3b0c442/warp/releases)
 ![GitHub](https://img.shields.io/github/license/e3b0c442/warp)
 
@@ -13,6 +14,201 @@ session storage.
 _Requires Go 1.13+_
 
 **This library is still pre-v1, and API stability is not guaranteed. The library will adhere to SemVer and Go backward campatibilty promises.**
+
+## Contents
+- [Installation](#installation)
+- [Quick start](#quick-start)
+  - [Starting registration](#starting-registration)
+  - [Finishing registration](#finishing-registration)
+  - [Starting authentication](#starting-authentication)
+  - [Finishing authentication](#finishing-authentication)
+- [Design goals](#design-goals)
+- [Specification coverage](#specification-coverage)
+- [High level API](#high-level-api)
+  - [Interfaces](#interfaces)
+    - [`RelyingParty`](#relyingparty)
+    - [`User`](#user)
+    - [`Credential`](#credential)
+  - [Helper functions](#helper-functions)
+    - [`UserFinder`](#userfinder)
+    - [`CredentialFinder`](#credentialfinder)
+  - [Registration](#registration)
+    - [`StartRegistration`](#startregistration)
+    - [`FinishRegistration`](#finishregistration)
+  - [Authentication](#authentication)
+    - [`StartAuthentication`](#startauthentication)
+    - [`FinishAuthentication`](#finishauthentication)
+- [Contributing](#contributing)
+- [Security vulnerabilities](#security-vulnerabilities)
+- [License](#license)
+## Installation
+
+1. You must have Go _1.13+_ installed.
+2. Use the `go get` command to bring the library into your workspace:
+```bash
+$ go get github.com/e3b0c442/warp
+```
+3. Import into your code:
+```go
+import "github.com/e3b0c442/warp"
+```
+
+## Quick start
+
+By design, _warp_ is not batteries included. Your application must have the following to use _warp_:
+
+1. The ability to marshal and unmarshal JSON,
+2. A session or other backend store to store the challenge data,
+3. A config or other struct which implements the `RelyingParty` interface,
+4. A user store which implements the `User` interface, and
+5. A credential store which implements the `Credential` interface.
+
+### Starting registration
+
+The user must be known. This example assumes the session store can infer the user from the request.
+
+```go
+import (
+    "encoding/json"
+    "net/http"
+    
+    "github.com/e3b0c442/warp"
+)
+
+func StartRegistration(w http.ResponseWriter, r *http.Request) {
+    //get the user data from a session cookie or similar
+    session, err := SessionStore.Get(r)
+    if err != nil {
+        return http.Error(w, "Bad session data", http.StatusBadRequest)
+    }
+
+    //generate a challenge with the user data
+    opts, err := warp.StartRegistration(relyingParty, session.User)
+    if err != nil {
+        return http.Error(w, "Unable to generate challenge", http.StatusInternalServerError)
+    }
+    //store the challenge for later verification
+    session.Data["creation"] = opts
+    http.SetCookie(w, session.Cookie)
+
+    //send the challenge to the client
+    json.NewEncoder(w).Encode(opts)
+}
+```
+
+### Finishing registration
+
+The implementation is responsible for parsing an `AttestationPublicKeyCredential` from the request.
+
+```go
+func FinishRegistration(w http.ResponseWriter, r *http.Request) {
+    //get the user data and challenge from a session cookie or similar
+    session, err := SessionStore.Get(r)
+    if err != nil {
+        return http.Error(w, "Bad session data", http.StatusBadRequest)
+    }
+
+    //get the stored challenge from the session store
+    storedOpts, ok := session.Data["creation"]
+    if !ok {
+        return http.Error(w, "No creation data in session", http.StatusForbidden)
+    }
+    opts := storedOpts.(PublicKeyCredentialCreationOptions)
+    
+    //parse the credential sent from the client
+    var cred AttestationPublicKeyCredential
+    err := json.NewDecoder(r.Body).Decode(&cred)
+    if err != nil {
+        return http.Error(w, "Error parsing credential", http.StatusBadRequest)
+    }
+
+    //verify the credential against the stored challenge
+    attestation, err := warp.FinishRegistration(relyingParty, CredentialStore.Find, &opts, &cred)
+    if err != nil {
+        return http.Error(w, "Credential verification failed", http.StatusUnauthorized)
+    }
+
+    //store the returned credential
+    err := CredentialStore.Store(session.User, attestation)
+    if err != nil {
+        return http.Error(w, "Unable to store credential", http.StatusInternalServerError)
+    }
+
+    //return success to the client
+    http.WriteHeader(http.StatusNoContent)
+}
+```
+
+### Starting authentication
+
+The user is only required to be provided for second-factor auth, as long as the session can correlate the authentication start and finish calls.
+
+```go
+func StartAuthentication(w http.ResponseWriter, r *http.Request) {
+    //get or start the session data
+    session, err := SessionStore.Get(r)
+    if err != nil {
+        session = SessionStore.Start(r)
+    }
+
+    opts, err := warp.StartAuthentication()
+    if err != nil {
+        return http.Error(w, "Unable to generate challenge", http.StatusInternalServerError)
+    }
+
+    //store the challenge for later verification
+    session.Data["request"] = opts
+    http.SetCookie(w, session.Cookie)
+
+    //send the challenge to the client
+    json.NewEncoder(w).Encode(opts)
+}
+```
+
+### Finishing authentication
+
+If the user is already known, have the passed `UserFinder` ignore the ID and just return the known user; otherwise pass a mechanism to look up based on the user handle.
+
+```go
+func FinishAuthentication(w http.ResponseWriter, r *http.Request) {
+    //get or start the session data
+    session, err := SessionStore.Get(r)
+    if err != nil {
+        return http.Error(w, "Bad session data", http.StatusBadRequest)
+    }
+
+    //get the stored challenge from the session store
+    storedOpts, ok := session.Data["request"]
+    if !ok {
+        return http.Error(w, "No request data in session", http.StatusForbidden)
+    }
+    opts := storedOpts.(PublicKeyCredentialRequestOptions)
+    
+    //parse the credential sent from the client
+    var cred AssertionPublicKeyCredential
+    err := json.NewDecoder(r.Body).Decode(&cred)
+    if err != nil {
+        return http.Error(w, "Error parsing credential", http.StatusBadRequest)
+    }
+
+    //verify the credential
+    authData, err := warp.FinishAuthentication(relyingParty, func(_ []byte) (warp.User, error) {
+        return session.User, nil
+    }, &opts, &cred)
+    if err != nil {
+        return http.Error(w, "Credential verification failed", http.StatusUnauthorized)
+    }
+    
+    //update credential info such as signcount
+    err := CredentialStore.Update(authData)
+    if err != nil {
+        //Implementation can decide whether this is a problem or not
+    }
+
+    //return success to the client
+    http.WriteHeader(http.StatusNoContent)
+}
+```
 
 ## Design goals
 _warp_ was built with the following goals in mind:
@@ -198,7 +394,15 @@ func FinishAuthentication(rp RelyingParty, userFinder UserFinder, opts *PublicKe
 * An `*AuthenticatorData` which contains information about the credential used to authenticate; may be used to update stored credential data such as sign count.
 * An error if there was a problem verifying the user, or `nil` on success
 
-# License
+## Contributing
+Please read [CONTRIBUTING.md](https://github.com/e3b0c442/warp/blob/master/CONTRIBUTING.md) for instructions on contributing to the project.
+
+## Security vulnerabilities
+Given the impact of the authentication flow on the overall security of a project, security vulnerabilities will be taken extremely seriously.
+
+If you discover a security vulnerability, please send an email to security@e3b0c442.io instead of opening an issue. Security vulnerabilities will be resolved within 14 days whenever feasible and the reporter and issue details will be acknowledged in the changelog once the code resolving the issue is released.
+
+## License
 Copyright (c) 2020 Nick Meyer.
 
 This project is released under the [MIT license](https://github.com/e3b0c442/warp/blob/master/LICENSE)
