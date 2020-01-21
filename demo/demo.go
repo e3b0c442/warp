@@ -188,7 +188,7 @@ func startRegistration(w http.ResponseWriter, r *http.Request) {
 		u = uu.(*user)
 	}
 
-	opts, err := warp.StartRegistration(relyingParty, u, warp.Attestation(warp.ConveyanceNone))
+	opts, err := warp.StartRegistration(relyingParty, u, warp.Attestation(warp.ConveyanceDirect))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Start register fail: %v", err), http.StatusInternalServerError)
 		return
