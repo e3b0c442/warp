@@ -114,7 +114,7 @@ func VerifyFIDOU2FAttestationStatement(attStmt []byte, rawAuthData []byte, clien
 	//certificate public key is not an Elliptic Curve (EC) public key over the
 	//P-256 curve, terminate this algorithm and return an appropriate error.
 	if len(att.X5C) != 1 {
-		return ErrVerifyAttestation.Wrap(NewError("x5c does not have exactly one member"))
+		return ErrVerifyAttestation.Wrap(NewError("x5c has %d members, expected 1", len(att.X5C)))
 	}
 	cert, err := x509.ParseCertificate(att.X5C[0])
 	if err != nil {

@@ -225,8 +225,8 @@ _warp_ was built with the following goals in mind:
   * Supported: ES256, ES384, ES512, EdDSA, RS1, RS256, RS384, RS512, PS256, PS384, PS512
   * To be implemented: None plannned
 * Attestation formats
-  * Supported: _none_
-  * To be implemented: _packed_, _tpm_, _android-key_, _android-safetynet_, _fido-u2f_
+  * Supported: _fido-u2f_, _none_
+  * To be implemented: _packed_, _tpm_, _android-key_, _android-safetynet_
 * Defined extensions
   * Supported: _appid_
   * To be implemented: _txAuthSimple_, _txAuthGeneric_, _authnSel_, _exts_, _uvi_, _loc_, _uvm_, _biometricPerfBounds_

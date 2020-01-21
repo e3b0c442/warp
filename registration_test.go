@@ -166,45 +166,6 @@ var mockPublicKeyCredentialCreationOptions = &PublicKeyCredentialCreationOptions
 	},
 }
 
-type predictableReader struct{}
-
-func (predictableReader) Read(p []byte) (n int, err error) {
-	b := bytes.NewBuffer(
-		[]byte{
-			0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14,
-			0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
-			0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c,
-			0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55,
-		},
-	)
-
-	return b.Read(p)
-}
-
-var cborPublicKey cbor.RawMessage = cbor.RawMessage{
-	0xa5, // map of 5 items
-	0x1,  // key 1 (Kty)
-	0x2,  // 2 (EC2 key)
-	0x3,  // key 3 (Alg)
-	0x26, // -7
-	0x20, // key -1
-	0x1,  // 1 (P256 Curve)
-	0x21, // key -2
-	0x58, // byte string, >24 bytes
-	0x20, // 32 bytes length
-	0x36, 0xc4, 0x85, 0xf8, 0x83, 0xda, 0xcf, 0xb3,
-	0x63, 0xc8, 0xf6, 0x4d, 0x6a, 0x82, 0xe5, 0x65,
-	0x3d, 0x7d, 0x36, 0x64, 0x2b, 0x3a, 0x10, 0x8b,
-	0x51, 0x55, 0x5a, 0x8d, 0x33, 0x40, 0x7d, 0x5c,
-	0x22, // key -3
-	0x58, // byte string, >24 bytes
-	0x20, // 32 bytes length
-	0x69, 0xc9, 0x52, 0x21, 0x4f, 0xce, 0x43, 0xea,
-	0x5f, 0x80, 0x43, 0x10, 0xbb, 0xe6, 0x3e, 0xd,
-	0xee, 0xcb, 0xf1, 0xe9, 0xba, 0x69, 0x5d, 0xac,
-	0x77, 0x53, 0xb1, 0x31, 0xbc, 0xbf, 0xf3, 0x98,
-}
-
 func errorOption() Option {
 	return func(_ interface{}) error {
 		return ErrOption
@@ -462,7 +423,7 @@ func TestDecodeAttestationObject(t *testing.T) {
 			Name: "good",
 			Cred: &AttestationPublicKeyCredential{
 				Response: AuthenticatorAttestationResponse{
-					AttestationObject: mockRawAttestationObject,
+					AttestationObject: mockRawNoneAttestationObject,
 				},
 			},
 			AuthData: mockAuthData,
@@ -943,13 +904,13 @@ func TestFinishRegistration(t *testing.T) {
 					AuthenticatorResponse: AuthenticatorResponse{
 						ClientDataJSON: []byte(`{"type":"webauthn.create","challenge":"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU","origin":"https://e3b0c442.io"}`),
 					},
-					AttestationObject: mockRawAttestationObject,
+					AttestationObject: mockRawNoneAttestationObject,
 				},
 			},
 			Err: ErrVerifyRegistration,
 		},
 		{
-			Name:       "good",
+			Name:       "good none attestation",
 			RP:         mockRP,
 			CredFinder: errorCredFinder,
 			Opts:       mockPublicKeyCredentialCreationOptions,
@@ -961,9 +922,28 @@ func TestFinishRegistration(t *testing.T) {
 				},
 				Response: AuthenticatorAttestationResponse{
 					AuthenticatorResponse: AuthenticatorResponse{
-						ClientDataJSON: []byte(`{"type":"webauthn.create","challenge":"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU","origin":"https://e3b0c442.io"}`),
+						ClientDataJSON: mockCreateClientDataJSON,
 					},
-					AttestationObject: mockRawAttestationObject,
+					AttestationObject: mockRawNoneAttestationObject,
+				},
+			},
+		},
+		{
+			Name:       "good fido-u2f attestation",
+			RP:         mockRP,
+			CredFinder: errorCredFinder,
+			Opts:       mockPublicKeyCredentialCreationOptions,
+			Cred: &AttestationPublicKeyCredential{
+				PublicKeyCredential: PublicKeyCredential{
+					CMCredential: CMCredential{
+						ID: "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+					},
+				},
+				Response: AuthenticatorAttestationResponse{
+					AuthenticatorResponse: AuthenticatorResponse{
+						ClientDataJSON: mockCreateClientDataJSON,
+					},
+					AttestationObject: mockRawFIDOU2FAttestationObject,
 				},
 			},
 		},
@@ -973,11 +953,12 @@ func TestFinishRegistration(t *testing.T) {
 		t.Run(test.Name, func(tt *testing.T) {
 			att, err := FinishRegistration(test.RP, test.CredFinder, test.Opts, test.Cred)
 			if err != nil {
+				err2 := err
+				for err2 != nil {
+					tt.Log(err2)
+					err2 = errors.Unwrap(err2)
+				}
 				if errors.Is(err, test.Err) {
-					for err != nil {
-						tt.Log(err)
-						err = errors.Unwrap(err)
-					}
 					return
 				}
 				tt.Fatalf("Got unexpected error %v", err)
