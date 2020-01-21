@@ -230,6 +230,8 @@ func verifyAttestationStatement(
 ) error {
 	rawAuthData, _ := attestation.AuthData.MarshalBinary() //cannot fail
 	switch attestation.Fmt {
+	case AttestationFormatPacked:
+		return VerifyPackedAttestationStatement(attestation.AttStmt, rawAuthData, clientDataHash)
 	case AttestationFormatFidoU2F:
 		return VerifyFIDOU2FAttestationStatement(attestation.AttStmt, rawAuthData, clientDataHash)
 	case AttestationFormatNone:

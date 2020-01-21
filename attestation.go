@@ -92,6 +92,84 @@ func VerifyNoneAttestationStatement(attStmt []byte, _ []byte, _ [32]byte) error 
 	return nil
 }
 
+//PackedAttestationStatement represents a decoded attestation statement of type
+//"packed"
+type PackedAttestationStatement struct {
+	Alg        COSEAlgorithmIdentifier `cbor:"alg"`
+	Sig        []byte                  `cbor:"sig"`
+	X5C        [][]byte                `cbor:"x5c"`
+	ECDAAKeyID []byte                  `cbor:"ecdaaKeyId"`
+}
+
+var coseToSigAlg = map[COSEAlgorithmIdentifier]x509.SignatureAlgorithm{
+	AlgorithmES256: x509.ECDSAWithSHA256,
+	AlgorithmES384: x509.ECDSAWithSHA384,
+	AlgorithmES512: x509.ECDSAWithSHA512,
+	AlgorithmEdDSA: x509.PureEd25519,
+	AlgorithmPS256: x509.SHA256WithRSAPSS,
+	AlgorithmPS384: x509.SHA384WithRSAPSS,
+	AlgorithmPS512: x509.SHA512WithRSAPSS,
+	AlgorithmRS1:   x509.SHA1WithRSA,
+	AlgorithmRS256: x509.SHA256WithRSA,
+	AlgorithmRS384: x509.SHA384WithRSA,
+	AlgorithmRS512: x509.SHA512WithRSA,
+}
+
+//VerifyPackedAttestationStatement verifies that an attestation statement of
+//type "packed" is valid
+func VerifyPackedAttestationStatement(attStmt []byte, rawAuthData []byte, clientDataHash [32]byte) error {
+	//1. Verify that attStmt is valid CBOR conforming to the syntax defined
+	//above and perform CBOR decoding on it to extract the contained fields.
+	var att PackedAttestationStatement
+	if err := cbor.Unmarshal(attStmt, &att); err != nil {
+		return ErrVerifyAttestation.Wrap(NewError("packed attestation statement not valid CBOR").Wrap(err))
+	}
+
+	//2. If x5c is present, this indicates that the attestation type is not
+	//ECDAA. In this case:
+	if len(att.X5C) > 0 {
+		//Verify that sig is a valid signature over the concatenation of
+		//authenticatorData and clientDataHash using the attestation public key in
+		//attestnCert with the algorithm specified in alg.
+		attestnCert, err := x509.ParseCertificate(att.X5C[0])
+		if err != nil {
+			return ErrVerifyAttestation.Wrap(NewError("error parsing attestation certificate").Wrap(err))
+		}
+		verificationData := append(rawAuthData, clientDataHash[:]...)
+		sigAlg, ok := coseToSigAlg[att.Alg]
+		if !ok {
+			return ErrVerifyAttestation.Wrap(NewError("unsupported signature algorithm").Wrap(err))
+		}
+		if err = attestnCert.CheckSignature(sigAlg, verificationData, att.Sig); err != nil {
+			return ErrVerifyAttestation.Wrap(NewError("error verifying signature over auth and client data").Wrap(err))
+		}
+
+		//Verify that attestnCert meets the requirements in §8.2.1 Packed
+		//Attestation Statement Certificate Requirements.
+
+		//Version MUST be set to 3 (which is indicated by an ASN.1 INTEGER with
+		//value 2).
+		if attestnCert.Version != 3 {
+			return ErrVerifyAttestation.Wrap(NewError("invalid attestation certificate version"))
+		}
+
+		//Subject field MUST be set to:
+		//
+		// * Subject-C
+		// ISO 3166 code specifying the country where the Authenticator vendor is incorporated (PrintableString)
+		// * Subject-O
+		// Legal name of the Authenticator vendor (UTF8String)
+		// * Subject-OU
+		// Literal string “Authenticator Attestation” (UTF8String)
+		// * Subject-CN
+		// A UTF8String of the vendor’s choosing
+		
+
+	}
+
+	return nil
+}
+
 //FIDOU2FAttestationStatement represents a decoded attestation statement of type
 //"fido-u2f"
 type FIDOU2FAttestationStatement struct {
@@ -106,7 +184,7 @@ func VerifyFIDOU2FAttestationStatement(attStmt []byte, rawAuthData []byte, clien
 	//above and perform CBOR decoding on it to extract the contained fields.
 	var att FIDOU2FAttestationStatement
 	if err := cbor.Unmarshal(attStmt, &att); err != nil {
-		return ErrVerifyAttestation.Wrap(NewError("fido-u2f attestation statement not valid cbor").Wrap(err))
+		return ErrVerifyAttestation.Wrap(NewError("fido-u2f attestation statement not valid CBOR").Wrap(err))
 	}
 
 	//2. Check that x5c has exactly one element and let attCert be that element.
