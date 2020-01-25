@@ -947,6 +947,25 @@ func TestFinishRegistration(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name:       "good packed attestation",
+			RP:         mockRP,
+			CredFinder: errorCredFinder,
+			Opts:       mockPublicKeyCredentialCreationOptions,
+			Cred: &AttestationPublicKeyCredential{
+				PublicKeyCredential: PublicKeyCredential{
+					CMCredential: CMCredential{
+						ID: "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+					},
+				},
+				Response: AuthenticatorAttestationResponse{
+					AuthenticatorResponse: AuthenticatorResponse{
+						ClientDataJSON: mockCreateClientDataJSON,
+					},
+					AttestationObject: mockRawPackedAttestationObject,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {

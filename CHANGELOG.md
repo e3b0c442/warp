@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.0] - 2020-01-21]
+## [0.4.0] - 2020-01-25
+### Added
+- Attestation verification for the _packed_ format has been added, continuing the previous guidance for trust chain validation. ECDAA attestation type is not supported due to lack of ECDAA support in Go standard library.
+
+## [0.3.0] - 2020-01-21
 ### Added
 - Attestation verification for the _fido-u2f_ format has been added. The attestation type and trust path are __not__ validated, only the signature against the provided certificate. It is up to the implementor to verify the trust chain using the `*AttestationObject` returned from `FinishRegistration`.
 ### Changed
@@ -18,7 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `UnmarshalBinary` and `MarshalBinary` methods on `AttestationObject` and `AuthenticatorData`, implementing the `BinaryMarshaler` and `BinaryUnmarshaler` interfaces
 - `Encode` method on `AuthenticatorData` to facilitate encoding `AttestationObject` for storage
-
 ### Changed
 - **[BREAKING]** `FinishRegistration` now returns `(*AttestationObject, error)` instead of `(string, []byte, error)`, to allow the implementor to choose how much or little of the authenticator data to save.
 - **[BREAKING]** `FinishAuthentication` now returns `(*AuthenticatorData, error)` instead of `(uint, error)`, to allow the implementor full access to the authenticator data for other uses
