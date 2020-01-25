@@ -40,19 +40,20 @@ func NewError(fmStr string, els ...interface{}) Error {
 
 //Categorical top-level errors
 var (
-	ErrDecodeAttestedCredentialData = Error{err: "Error decoding attested credential data"}
-	ErrDecodeAuthenticatorData      = Error{err: "Error decoding authenticator data"}
-	ErrDecodeCOSEKey                = Error{err: "Error decoding raw public key"}
-	ErrEncodeAttestedCredentialData = Error{err: "Error encoding attested credential data"}
-	ErrEncodeAuthenticatorData      = Error{err: "Error encoding authenticator data"}
-	ErrGenerateChallenge            = Error{err: "Error generating challenge"}
-	ErrMarshalAttestationObject     = Error{err: "Error marshaling attestation object"}
-	ErrOption                       = Error{err: "Option error"}
-	ErrNotImplemented               = Error{err: "Not implemented"}
-	ErrUnmarshalAttestationObject   = Error{err: "Error unmarshaling attestation object"}
-	ErrVerifyAttestation            = Error{err: "Error verifying attestation"}
-	ErrVerifyAuthentication         = Error{err: "Error verifying authentication"}
-	ErrVerifyClientExtensionOutput  = Error{err: "Error verifying client extension output"}
-	ErrVerifyRegistration           = Error{err: "Error verifying registration"}
-	ErrVerifySignature              = Error{err: "Error verifying signature"}
+	ErrDecodeAttestedCredentialData = Error{err: "error decoding attested credential data"}
+	ErrDecodeAuthenticatorData      = Error{err: "error decoding authenticator data"}
+	ErrDecodeCOSEKey                = Error{err: "error decoding raw public key"}
+	ErrECDAANotSupported            = Error{err: "ECDAA not supported"}
+	ErrEncodeAttestedCredentialData = Error{err: "error encoding attested credential data"}
+	ErrEncodeAuthenticatorData      = Error{err: "error encoding authenticator data"}
+	ErrGenerateChallenge            = Error{err: "error generating challenge"}
+	ErrMarshalAttestationObject     = Error{err: "error marshaling attestation object"}
+	ErrOption                       = Error{err: "option error"}
+	ErrNotImplemented               = Error{err: "not implemented"}
+	ErrUnmarshalAttestationObject   = Error{err: "error unmarshaling attestation object"}
+	ErrVerifyAttestation            = Error{err: "error verifying attestation"}
+	ErrVerifyAuthentication         = Error{err: "error verifying authentication"}
+	ErrVerifyClientExtensionOutput  = Error{err: "error verifying client extension output"}
+	ErrVerifyRegistration           = Error{err: "error verifying registration"}
+	ErrVerifySignature              = Error{err: "error verifying signature"}
 )

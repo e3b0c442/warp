@@ -10,6 +10,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
 	"log"
 	"math/big"
@@ -132,12 +133,34 @@ func TestMain(m *testing.M) {
 
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(0),
+		Version:      3,
+		Subject: pkix.Name{
+			Country:            []string{"US"},
+			Organization:       []string{"Acme"},
+			OrganizationalUnit: []string{"Authenticator Attestation"},
+			CommonName:         "Wile E. Coyote",
+		},
+		Extensions: []pkix.Extension{
+			{
+				Id:       idFidoGenCeAaguid,
+				Critical: false,
+				Value: []byte{
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				},
+			},
+		},
+		IsCA: false,
 	}
 
 	goodP256CertBytes, err = x509.CreateCertificate(&predictableReader{}, &template, &template, &goodP256Key.PublicKey, goodP256Key)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	//template.Subject.OrganizationalUnit = nil
+	//v2cert, err := x509.CreateCertificate(&predictableReader{}, &template, &template, &goodP256Key.PublicKey, goodP256Key)
+	//log.Fatalf("len %d: %#v", len(v2cert), v2cert)
 
 	goodP256Cert, err = x509.ParseCertificate(goodP256CertBytes)
 	if err != nil {
@@ -287,10 +310,24 @@ func TestMain(m *testing.M) {
 		0x7b, 0xa6, 0xd6, 0x8b, 0x25, 0x64,
 		0x63,             // text string 3 chars
 		0x78, 0x35, 0x63, // "x5c"
-		0x81,       // array, 1 member
-		0x58, 0xf6, // byte string, 246 bytes
+		0x81,             // array, 1 member
+		0x59, 0x01, 0xab, // byte string, 427 bytes
 	}, goodP256CertBytes...)
 
+	/*verif := append(mockRawAuthData, mockCreateClientDataJSONHash[:]...)
+	vsum := sha256.Sum256(verif)
+	r, s, err := ecdsa.Sign(&predictableReader{}, goodP256Key, vsum[:])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sigBytes, err := asn1.Marshal(struct{ R, S *big.Int }{R: r, S: s})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Fatalf("len %d: %#v", len(sigBytes), sigBytes)
+	*/
 	mockRawFIDOU2FAttestationObject = cbor.RawMessage(
 		append(
 			append(

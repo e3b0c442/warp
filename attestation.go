@@ -5,9 +5,14 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/x509"
+	"encoding/asn1"
+	"regexp"
 
 	"github.com/fxamacker/cbor"
 )
+
+var iso3166CountryCode = regexp.MustCompile(`[a-zA-Z]{2,3}`)
+var idFidoGenCeAaguid asn1.ObjectIdentifier = asn1.ObjectIdentifier([]int{1, 3, 6, 1, 4, 1, 45724, 1, 1, 4})
 
 //AttestationObject contains both authenticator data and an attestation
 //statement.
@@ -125,9 +130,17 @@ func VerifyPackedAttestationStatement(attStmt []byte, rawAuthData []byte, client
 		return ErrVerifyAttestation.Wrap(NewError("packed attestation statement not valid CBOR").Wrap(err))
 	}
 
-	//2. If x5c is present, this indicates that the attestation type is not
-	//ECDAA. In this case:
+	authData := AuthenticatorData{}
+	if err := authData.UnmarshalBinary(rawAuthData); err != nil {
+		return ErrVerifyAttestation.Wrap(NewError("error unmarshaling authData"))
+	}
+
+	verificationData := append(rawAuthData, clientDataHash[:]...)
+
 	if len(att.X5C) > 0 {
+		//2. If x5c is present, this indicates that the attestation type is not
+		//ECDAA. In this case:
+
 		//Verify that sig is a valid signature over the concatenation of
 		//authenticatorData and clientDataHash using the attestation public key in
 		//attestnCert with the algorithm specified in alg.
@@ -135,7 +148,7 @@ func VerifyPackedAttestationStatement(attStmt []byte, rawAuthData []byte, client
 		if err != nil {
 			return ErrVerifyAttestation.Wrap(NewError("error parsing attestation certificate").Wrap(err))
 		}
-		verificationData := append(rawAuthData, clientDataHash[:]...)
+
 		sigAlg, ok := coseToSigAlg[att.Alg]
 		if !ok {
 			return ErrVerifyAttestation.Wrap(NewError("unsupported signature algorithm").Wrap(err))
@@ -163,8 +176,66 @@ func VerifyPackedAttestationStatement(attStmt []byte, rawAuthData []byte, client
 		// Literal string “Authenticator Attestation” (UTF8String)
 		// * Subject-CN
 		// A UTF8String of the vendor’s choosing
-		
+		if len(attestnCert.Subject.Country) < 1 || len(attestnCert.Subject.Country[0]) < 2 || len(attestnCert.Subject.Country[0]) > 3 {
+			return ErrVerifyAttestation.Wrap(NewError("invalid subject country, must be ISO3166 code"))
+		}
+		if len(attestnCert.Subject.Organization) < 1 {
+			return ErrVerifyAttestation.Wrap(NewError("subject organization not present"))
+		}
+		if len(attestnCert.Subject.OrganizationalUnit) < 1 || attestnCert.Subject.OrganizationalUnit[0] != "Authenticator Attestation" {
+			return ErrVerifyAttestation.Wrap(NewError("invalid subject organizational unit, must be \"Authenticator Attestation\""))
+		}
+		if attestnCert.Subject.CommonName == "" {
+			return ErrVerifyAttestation.Wrap(NewError("subject common name not present"))
+		}
 
+		//If the related attestation root certificate is used for multiple authenticator models, the Extension OID
+		//1.3.6.1.4.1.45724.1.1.4 (id-fido-gen-ce-aaguid) MUST be present, containing the AAGUID as a 16-byte OCTET
+		//STRING. The extension MUST NOT be marked as critical.
+		for _, ext := range attestnCert.Extensions {
+			if ext.Id.Equal(idFidoGenCeAaguid) {
+				if ext.Critical {
+					return ErrVerifyAttestation.Wrap(NewError("AAGUID extension marked critical"))
+				}
+				var certAAGUID []byte
+				_, err := asn1.Unmarshal(ext.Value, &certAAGUID)
+				if err != nil {
+					return ErrVerifyAttestation.Wrap(NewError("error unmarshaling certificate AAGUID").Wrap(err))
+				}
+
+				if !bytes.Equal(certAAGUID, authData.AttestedCredentialData.AAGUID[:]) {
+					return ErrVerifyAttestation.Wrap(NewError("AAGUID mismatch"))
+				}
+			}
+		}
+
+		//The Basic Constraints extension MUST have the CA component set to false.
+		if attestnCert.IsCA {
+			return ErrVerifyAttestation.Wrap(NewError("attestation certificate has CA constraint"))
+		}
+	} else if att.ECDAAKeyID != nil {
+		//3. If ecdaaKeyId is present, then the attestation type is ECDAA.
+		return ErrVerifyAttestation.Wrap(ErrECDAANotSupported)
+	} else {
+		//4. If neither x5c nor ecdaaKeyId is present, self attestation is in
+		//use.
+
+		//Validate that alg matches the algorithm of the credentialPublicKey in
+		//authenticatorData.
+		var credPubKey COSEKey
+		if err := cbor.Unmarshal(authData.AttestedCredentialData.CredentialPublicKey, &credPubKey); err != nil {
+			return ErrVerifyAttestation.Wrap(NewError("error unmarshaling credential public key").Wrap(err))
+		}
+		if credPubKey.Alg != int(att.Alg) {
+			return ErrVerifyAttestation.Wrap(NewError("credential public key algorithm does not match attestation algorithm"))
+		}
+
+		//Verify that sig is a valid signature over the concatenation of
+		//authenticatorData and clientDataHash using the credential public key
+		//with alg.
+		if err := VerifySignature(authData.AttestedCredentialData.CredentialPublicKey, verificationData, att.Sig); err != nil {
+			return ErrVerifyAttestation.Wrap(err)
+		}
 	}
 
 	return nil

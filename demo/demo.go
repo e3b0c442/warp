@@ -243,6 +243,7 @@ func finishRegistration(w http.ResponseWriter, r *http.Request) {
 	users[username].(*user).credentials[id] = &toStore
 
 	log.Printf("NEW CREDENTIAL: %#v", id)
+	log.Printf("%#v", *att)
 
 	w.WriteHeader(http.StatusNoContent)
 }
