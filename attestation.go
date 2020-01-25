@@ -6,12 +6,10 @@ import (
 	"crypto/elliptic"
 	"crypto/x509"
 	"encoding/asn1"
-	"regexp"
 
 	"github.com/fxamacker/cbor"
 )
 
-var iso3166CountryCode = regexp.MustCompile(`[a-zA-Z]{2,3}`)
 var idFidoGenCeAaguid asn1.ObjectIdentifier = asn1.ObjectIdentifier([]int{1, 3, 6, 1, 4, 1, 45724, 1, 1, 4})
 
 //AttestationObject contains both authenticator data and an attestation
