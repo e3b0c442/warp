@@ -224,11 +224,21 @@ func TestFinishAuthentication(t *testing.T) {
 		UserFinder UserFinder
 		Opts       *PublicKeyCredentialRequestOptions
 		Cred       *AssertionPublicKeyCredential
+		Vals       []AuthenticationValidator
 		Expected   *AuthenticatorData
 		Err        error
 	}
 
 	tests := []authTest{
+		{
+			Name: "bad provided validator",
+			Vals: []AuthenticationValidator{
+				func(*PublicKeyCredentialRequestOptions, *AssertionPublicKeyCredential) error {
+					return errors.New("err")
+				},
+			},
+			Err: ErrVerifyAuthentication,
+		},
 		{
 			Name: "disallowed credential",
 			Opts: &PublicKeyCredentialRequestOptions{
@@ -678,7 +688,7 @@ func TestFinishAuthentication(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(tt *testing.T) {
-			out, err := FinishAuthentication(test.RP, test.UserFinder, test.Opts, test.Cred)
+			out, err := FinishAuthentication(test.RP, test.UserFinder, test.Opts, test.Cred, test.Vals...)
 			if err != nil {
 				if errors.Is(err, test.Err) {
 					for err != nil {

@@ -528,16 +528,6 @@ func TestVerifyClientExtensionsOutputs(t *testing.T) {
 			},
 			Err: NewError("Extension key appid provided in credential but not options"),
 		},
-		{
-			Name: "appid bad",
-			Ins: AuthenticationExtensionsClientInputs{
-				"appid": "https://e3b0c442.io",
-			},
-			Outs: AuthenticationExtensionsClientOutputs{
-				"appid": "true",
-			},
-			Err: ErrVerifyClientExtensionOutput,
-		},
 	}
 
 	for _, test := range tests {

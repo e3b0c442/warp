@@ -89,120 +89,126 @@ func TestUseAppID(t *testing.T) {
 	}
 }
 
-func TestVerifyAppID(t *testing.T) {
-	type verifyTest struct {
-		Name string
-		Out  interface{}
-		Err  error
+func TestValidateAppID(t *testing.T) {
+	type validateTest struct {
+		Name         string
+		Opts         *PublicKeyCredentialRequestOptions
+		Cred         *AssertionPublicKeyCredential
+		ExpectedOpts *PublicKeyCredentialRequestOptions
+		Err          error
 	}
 
-	tests := []verifyTest{
+	tests := []validateTest{
 		{
-			Name: "good",
-			Out:  true,
+			Name:         "Key not in cred",
+			Opts:         &PublicKeyCredentialRequestOptions{},
+			Cred:         &AssertionPublicKeyCredential{},
+			ExpectedOpts: &PublicKeyCredentialRequestOptions{},
 		},
 		{
-			Name: "bad",
-			Out:  "bad",
-			Err:  ErrVerifyClientExtensionOutput,
+			Name: "Key in cred but not opts",
+			Opts: &PublicKeyCredentialRequestOptions{},
+			Cred: &AssertionPublicKeyCredential{
+				PublicKeyCredential: PublicKeyCredential{
+					Extensions: AuthenticationExtensionsClientOutputs{
+						"appid": true,
+					},
+				},
+			},
+			Err: ErrVerifyClientExtensionOutput,
+		},
+		{
+			Name: "Invalid output type",
+			Opts: &PublicKeyCredentialRequestOptions{
+				Extensions: AuthenticationExtensionsClientInputs{
+					"appid": "https://e3b0c442.io",
+				},
+			},
+			Cred: &AssertionPublicKeyCredential{
+				PublicKeyCredential: PublicKeyCredential{
+					Extensions: AuthenticationExtensionsClientOutputs{
+						"appid": "true",
+					},
+				},
+			},
+			Err: ErrVerifyClientExtensionOutput,
+		},
+		{
+			Name: "Invalid input type",
+			Opts: &PublicKeyCredentialRequestOptions{
+				Extensions: AuthenticationExtensionsClientInputs{
+					"appid": 1,
+				},
+			},
+			Cred: &AssertionPublicKeyCredential{
+				PublicKeyCredential: PublicKeyCredential{
+					Extensions: AuthenticationExtensionsClientOutputs{
+						"appid": true,
+					},
+				},
+			},
+			Err: ErrVerifyClientExtensionOutput,
+		},
+		{
+			Name: "Client returned false",
+			Opts: &PublicKeyCredentialRequestOptions{
+				Extensions: AuthenticationExtensionsClientInputs{
+					"appid": "https://e3b0c442.io",
+				},
+			},
+			Cred: &AssertionPublicKeyCredential{
+				PublicKeyCredential: PublicKeyCredential{
+					Extensions: AuthenticationExtensionsClientOutputs{
+						"appid": false,
+					},
+				},
+			},
+			ExpectedOpts: &PublicKeyCredentialRequestOptions{
+				Extensions: AuthenticationExtensionsClientInputs{
+					"appid": "https://e3b0c442.io",
+				},
+			},
+		},
+
+		{
+			Name: "Client returned true",
+			Opts: &PublicKeyCredentialRequestOptions{
+				Extensions: AuthenticationExtensionsClientInputs{
+					"appid": "https://e3b0c442.io",
+				},
+			},
+			Cred: &AssertionPublicKeyCredential{
+				PublicKeyCredential: PublicKeyCredential{
+					Extensions: AuthenticationExtensionsClientOutputs{
+						"appid": true,
+					},
+				},
+			},
+			ExpectedOpts: &PublicKeyCredentialRequestOptions{
+				Extensions: AuthenticationExtensionsClientInputs{
+					"appid": "https://e3b0c442.io",
+				},
+				RPID: "https://e3b0c442.io",
+			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.Name, func(tt *testing.T) {
-			err := VerifyAppID(nil, test.Out)
+			err := ValidateAppID()(test.Opts, test.Cred)
 			if err != nil {
 				if errors.Is(err, test.Err) {
+					tt.Logf("Got expected error %v", err)
 					return
 				}
 				tt.Fatalf("Got unexpected error %v", err)
 			}
 			if test.Err != nil {
-				tt.Fatal("Did not get expected error")
+				tt.Fatalf("Did not get expected error")
+			}
+			if !reflect.DeepEqual(test.Opts, test.ExpectedOpts) {
+				tt.Fatalf("Output mismatch got %#v expected %#v", *test.Opts, *test.ExpectedOpts)
 			}
 		})
 	}
-}
-
-func TestEffectiveRPID(t *testing.T) {
-	type rpidTest struct {
-		Name     string
-		RP       RelyingParty
-		In       AuthenticationExtensionsClientInputs
-		Out      AuthenticationExtensionsClientOutputs
-		Expected string
-	}
-
-	tests := []rpidTest{
-		{
-			Name: "missing in credential",
-			RP:   mockRP,
-			In: AuthenticationExtensionsClientInputs{
-				"appid": "https://e3b0c442.io",
-			},
-			Expected: "e3b0c442.io",
-		},
-		{
-			Name: "wrong type in credential",
-			RP:   mockRP,
-			In: AuthenticationExtensionsClientInputs{
-				"appid": "https://e3b0c442.io",
-			},
-			Out: AuthenticationExtensionsClientOutputs{
-				"appid": "true",
-			},
-			Expected: "e3b0c442.io",
-		},
-		{
-			Name: "wrong value in credential",
-			RP:   mockRP,
-			In: AuthenticationExtensionsClientInputs{
-				"appid": "https://e3b0c442.io",
-			},
-			Out: AuthenticationExtensionsClientOutputs{
-				"appid": false,
-			},
-			Expected: "e3b0c442.io",
-		},
-		{
-			Name: "missing in options",
-			RP:   mockRP,
-			Out: AuthenticationExtensionsClientOutputs{
-				"appid": true,
-			},
-			Expected: "e3b0c442.io",
-		},
-		{
-			Name: "wrong type in options",
-			RP:   mockRP,
-			In: AuthenticationExtensionsClientInputs{
-				"appid": 3,
-			},
-			Out: AuthenticationExtensionsClientOutputs{
-				"appid": "true",
-			},
-			Expected: "e3b0c442.io",
-		},
-		{
-			Name: "good",
-			RP:   mockRP,
-			In: AuthenticationExtensionsClientInputs{
-				"appid": "https://e3b0c442.io",
-			},
-			Out: AuthenticationExtensionsClientOutputs{
-				"appid": true,
-			},
-			Expected: "https://e3b0c442.io",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.Name, func(tt *testing.T) {
-			rpid := EffectiveRPID(test.RP, test.In, test.Out)
-			if rpid != test.Expected {
-				tt.Fatalf("Got %s expected %s", rpid, test.Expected)
-			}
-		})
-	}
-
 }

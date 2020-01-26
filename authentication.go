@@ -39,7 +39,15 @@ func FinishAuthentication(
 	userFinder UserFinder,
 	opts *PublicKeyCredentialRequestOptions,
 	cred *AssertionPublicKeyCredential,
+	vals ...AuthenticationValidator,
 ) (*AuthenticatorData, error) {
+	//0. NON-NORMATIVE run all additional validators provided as args.
+	for _, val := range vals {
+		if err := val(opts, cred); err != nil {
+			return nil, ErrVerifyAuthentication.Wrap(err)
+		}
+	}
+
 	//1. If the allowCredentials option was given when this authentication
 	//ceremony was initiated, verify that credential.id identifies one of the
 	//public key credentials that were listed in allowCredentials.
@@ -116,7 +124,10 @@ func FinishAuthentication(
 
 	//11. Verify that the rpIdHash in authData is the SHA-256 hash of the RP ID
 	//expected by the Relying Party.
-	if err = verifyRPIDHash(EffectiveRPID(rp, opts.Extensions, cred.Extensions), authData); err != nil {
+	if opts.RPID == "" {
+		opts.RPID = rp.EntityID()
+	}
+	if err = verifyRPIDHash(opts.RPID, authData); err != nil {
 		return nil, ErrVerifyAuthentication.Wrap(err)
 	}
 
@@ -143,6 +154,9 @@ func FinishAuthentication(
 	//options, i.e., no extensions are present that were not requested. In the
 	//general case, the meaning of "are as expected" is specific to the Relying
 	//Party and which extensions are in use.
+	//NON-NORMATIVE: We are only verifying the existence of keys is valid here;
+	//to actually validate the extension an AuthenticationValidator must be
+	//passed to this function.
 	if err := verifyClientExtensionsOutputs(opts.Extensions, cred.Extensions); err != nil {
 		return nil, ErrVerifyAuthentication.Wrap(err)
 	}

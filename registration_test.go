@@ -508,10 +508,20 @@ func TestFinishRegistration(t *testing.T) {
 		CredFinder CredentialFinder
 		Opts       *PublicKeyCredentialCreationOptions
 		Cred       *AttestationPublicKeyCredential
+		Vals       []RegistrationValidator
 		Err        error
 	}
 
 	tests := []registrationTest{
+		{
+			Name: "bad provided validator",
+			Vals: []RegistrationValidator{
+				func(*PublicKeyCredentialCreationOptions, *AttestationPublicKeyCredential) error {
+					return errors.New("err")
+				},
+			},
+			Err: ErrVerifyAuthentication,
+		},
 		{
 			Name: "bad client data parse",
 			RP:   mockRP,
@@ -970,7 +980,7 @@ func TestFinishRegistration(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(tt *testing.T) {
-			att, err := FinishRegistration(test.RP, test.CredFinder, test.Opts, test.Cred)
+			att, err := FinishRegistration(test.RP, test.CredFinder, test.Opts, test.Cred, test.Vals...)
 			if err != nil {
 				err2 := err
 				for err2 != nil {
