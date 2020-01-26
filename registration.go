@@ -80,10 +80,18 @@ func FinishRegistration(
 	credFinder CredentialFinder,
 	opts *PublicKeyCredentialCreationOptions,
 	cred *AttestationPublicKeyCredential,
+	vals ...RegistrationValidator,
 ) (
 	*AttestationObject,
 	error,
 ) {
+	//0. NON-NORMATIVE run all additional validators provided as args.
+	for _, val := range vals {
+		if err := val(opts, cred); err != nil {
+			return nil, ErrVerifyAuthentication.Wrap(err)
+		}
+	}
+
 	//1. Let JSONtext be the result of running UTF-8 decode on the value of
 	//response.clientDataJSON.
 	//TODO research if there are any instances where the byte stream is not
@@ -164,6 +172,9 @@ func FinishRegistration(
 	//options, i.e., no extensions are present that were not requested. In the
 	//general case, the meaning of "are as expected" is specific to the Relying
 	//Party and which extensions are in use.
+	//NON-NORMATIVE: We are only verifying the existence of keys is valid here;
+	//to actually validate the extension a RegistrationValidator must be passed
+	//to this function.
 	if err := verifyClientExtensionsOutputs(opts.Extensions, cred.Extensions); err != nil {
 		return nil, ErrVerifyRegistration.Wrap(err)
 	}

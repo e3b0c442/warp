@@ -308,6 +308,20 @@ type CredentialFinder func([]byte) (Credential, error)
 ```
 `CredentialFinder` defines a function which takes a raw credential ID and returns an object conforming to the Credential interface. If the credential does not exist in the system, return `nil` and an appropriate error.
 
+#### `RegistrationValidator`
+
+```go
+type RegistrationValidator func(opts *PublicKeyCredentialCreationOptions, cred *AttestationPublicKeyCredential) error
+```
+`RegistrationValidator` defines a function which takes the credential creation options and returend attestation credential, and performs any additional validation desired. Pointers to the two structs are passed so they can be modified if needed. `RegistrationValidator`s are run before any other validations in `FinishRegistration`
+
+#### `AuthenticationValidator`
+
+```go
+type AuthenticationValidator func(opts *PublicKeyCredentialRequestOptions, cred *AssertionPublicKeyCredential) error
+```
+`AuthenticationValidator` defines a function which takes the credential request options and returned assertion credential, and performs any additional validation desired. Pointers to the two structs are passed so they can be modified if needed. `AuthenticationValidator`s are run before any other validations in `FinishAuthentication`
+
 
 ### Registration:
 ![Registration flow](https://www.w3.org/TR/webauthn-1/images/webauthn-registration-flow-01.svg)
@@ -339,7 +353,7 @@ The returned object or its data must be stored in the server-side session cache 
 #### `FinishRegistration`
 
 ```go
-func FinishRegistration(rp RelyingParty, credFinder CredentialFinder, opts *PublicKeyCredentialCreationOptions, cred *AttestationPublicKeyCredential) (*AttestationObject, error)
+func FinishRegistration(rp RelyingParty, credFinder CredentialFinder, opts *PublicKeyCredentialCreationOptions, cred *AttestationPublicKeyCredential, vals ...RegistrationValidator) (*AttestationObject, error)
 ```
 
 `FinishRegistration` completes the registration ceremony, by verifying the public key credential sent by the client against the stored creation options. If the verification is successful, a credential ID and public key are returned which must be stored. It is the responsibility of the implementor to store these and associate with the calling user.
@@ -349,6 +363,7 @@ func FinishRegistration(rp RelyingParty, credFinder CredentialFinder, opts *Publ
 * `credFinder`: A function conforming to `CredentialFinder` which is used to check if a credential ID already exists in the system
 * `opts`: A pointer to the stored `PublicKeyCredentialCreationOptions` which was previously sent to the client
 * `cred`: The parsed `AttestationPublicKeyCredential` that was sent from the client in response to the server challenge
+* `vals`: Additional custom validations to be performed in addition to those required by the specification
 
 ##### Return values:
 * An `*AttestationObject` which contains all of the information that may need to be stored to authenticate using the credential
@@ -379,7 +394,7 @@ func StartAuthentication(opts ...Option) (*PublicKeyCredentialRequestOptions, er
 #### FinishAuthentication
 
 ```go
-func FinishAuthentication(rp RelyingParty, userFinder UserFinder, opts *PublicKeyCredentialRequestOptions, cred *AssertionPublicKeyCredential) (*AuthenticatorData, error)
+func FinishAuthentication(rp RelyingParty, userFinder UserFinder, opts *PublicKeyCredentialRequestOptions, cred *AssertionPublicKeyCredential, vals ...AuthenticationValidator) (*AuthenticatorData, error)
 ```
 
 `FinishAuthentication` completes the authentication ceremony by verifying the signed challenge and credential data with the stored public key for the credential. If the verification is successful, it returns a new signature counter value to be stored, and a `nil` error. Otherwise, 0 and an error describing the failure are returned. It is the responsibility of the caller to store the updated signature counter if they are choosing to verify this.
@@ -389,6 +404,7 @@ func FinishAuthentication(rp RelyingParty, userFinder UserFinder, opts *PublicKe
 * `userFinder`: A function conforming to the `UserFinder` type which accepts a user handle as an argument and returns an object implementing the `User` interface. If the caller is not implementing the passwordless/single factor flow, the function can ignore the user handle and just return the already-known `User`.
 * `opts`: A pointer to the stored `PublicKeyCredentialRequestOptions` which was previously sent to the client.
 * `cred`: The parsed `AssertionPublicKeyCredential` that was sent from the client in response to the server challenge.
+* `vals`: Additional custom validations to be performed in addition to those required by the specification
 
 ##### Return values:
 * An `*AuthenticatorData` which contains information about the credential used to authenticate; may be used to update stored credential data such as sign count.

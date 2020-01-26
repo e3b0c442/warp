@@ -2,7 +2,15 @@ package warp
 
 //Identifiers for defined extensions
 const (
-	ExtensionAppID = "appid"
+	ExtensionAppID               = "appid"
+	ExtensionTxAuthSimple        = "txAuthSimple"
+	ExtensionTxAuthGeneric       = "txAuthGeneric"
+	ExtensionAuthnSel            = "authnSel"
+	ExtensionExts                = "exts"
+	ExtensionUVI                 = "uvi"
+	ExtensionLoc                 = "loc"
+	ExtensionUVM                 = "uvm"
+	ExtensionBiometricPerfBounds = "biometricPerfBounds"
 )
 
 //AuthenticationExtensionsClientInputs contains the client extension input
@@ -35,34 +43,41 @@ func UseAppID(appID string) Extension {
 	}
 }
 
-//ExtensionValidator defines a function which validates an extension output
-type ExtensionValidator func(interface{}, interface{}) error
+//RegistrationExtensionValidators is a map to all extension validators for
+//extensions allowed during the registration ceremony
+var RegistrationExtensionValidators map[string]RegistrationValidator = map[string]RegistrationValidator{}
 
-//ExtensionValidators is a map to all implemented extension validators
-var ExtensionValidators map[string]ExtensionValidator = map[string]ExtensionValidator{
-	ExtensionAppID: VerifyAppID,
+//AuthenticationExtensionValidators is a map to all extension validators for
+//extensions allowed during the authentication ceremony
+var AuthenticationExtensionValidators map[string]AuthenticationValidator = map[string]AuthenticationValidator{
+	ExtensionAppID: ValidateAppID(),
 }
 
-//VerifyAppID verifies the AppID extension response
-func VerifyAppID(_, out interface{}) error {
-	if _, ok := out.(bool); ok {
+//ValidateAppID validates the AppID extension and updates the credential
+//request options with the valid AppID as needed
+func ValidateAppID() AuthenticationValidator {
+	return func(opts *PublicKeyCredentialRequestOptions, cred *AssertionPublicKeyCredential) error {
+		o, ok := cred.Extensions[ExtensionAppID]
+		if !ok {
+			return nil // do not fail on client ignored extension
+		}
+		i, ok := opts.Extensions[ExtensionAppID]
+		if !ok {
+			return ErrVerifyClientExtensionOutput.Wrap(NewError("appid extension present in credential but not requested in options"))
+		}
+
+		out, ok := o.(bool)
+		if !ok {
+			return ErrVerifyClientExtensionOutput.Wrap(NewError("unexpected type on appid extension output"))
+		}
+		in, ok := i.(string)
+		if !ok {
+			return ErrVerifyClientExtensionOutput.Wrap(NewError("unexpected type on appid extension input"))
+		}
+
+		if out {
+			opts.RPID = in
+		}
 		return nil
 	}
-	return ErrVerifyClientExtensionOutput.Wrap(NewError("AppID output value must be bool"))
-}
-
-//EffectiveRPID returns the effective relying party ID for the ceremony based on
-//the usage of the AppID extension
-func EffectiveRPID(rp RelyingParty, in AuthenticationExtensionsClientInputs, out AuthenticationExtensionsClientOutputs) string {
-	if outV, ok := out[ExtensionAppID]; ok {
-		if useAppID, ok := outV.(bool); ok && useAppID {
-			if inV, ok := in[ExtensionAppID]; ok {
-				if appID, ok := inV.(string); ok {
-					return appID
-				}
-			}
-		}
-	}
-
-	return rp.EntityID()
 }

@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Added
+- `RegistrationValidator` and `AuthenticationValidator` function type for passing additional validations into the `Finish...` functions. These functions take pointerl to the ceremonies' respective options and credential structs as arguments, and as such can modify those values as needed. If the functions return an error, the ceremony ends in error. The `Finish...` functions will continue to have all validations required by the specification implemented.
+- Added `ValidateAppID` function conforming to `AuthenticationValidator` which replaces `VerifyAppID` and `EffectiveRPID`
+
+### Changed
+- `FinishRegistration` and `FinishAuthentication` now accept zero or more `RegistrationValidator` or `AuthenticationValidator` functions respectively as variable arguments. Any provided validators are run BEFORE any of the required validation checks, and end the ceremony if they return an error. Note that this is NOT a breaking change as zero of these arguments may be provided.
+
+### Removed
+- **[BREAKING]** Removed the `ExtensionValidator` type in favor of the new general `RegistrationValidator` and `AuthenticationValidator` types.
+- **[BREAKING]** Removed the `EffectiveRPID` function in favor of updating the RPID via a validator function
+- **[BREAKING]** Removed the `VerifyAppID` function in favor of `ValidateAppID` (noted above)
+
 ## [0.4.0] - 2020-01-25
 ### Added
 - Attestation verification for the _packed_ format has been added, continuing the previous guidance for trust chain validation. ECDAA attestation type is not supported due to lack of ECDAA support in Go standard library.

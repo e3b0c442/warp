@@ -102,17 +102,10 @@ func verifyUserVerified(authData *AuthenticatorData) error {
 }
 
 func verifyClientExtensionsOutputs(ins AuthenticationExtensionsClientInputs, outs AuthenticationExtensionsClientOutputs) error {
-	for k, credV := range outs {
-		optsV, ok := ins[k]
+	for k := range outs {
+		_, ok := ins[k]
 		if !ok {
 			return NewError("Extension key %s provided in credential but not options", k)
-		}
-
-		if validator, ok := ExtensionValidators[k]; ok { //ignore if no validator
-			err := validator(optsV, credV)
-			if err != nil {
-				return err
-			}
 		}
 	}
 	return nil
