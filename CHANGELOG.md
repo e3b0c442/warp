@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.5.0] - 2020-01-26
 ### Added
 - `RegistrationValidator` and `AuthenticationValidator` function type for passing additional validations into the `Finish...` functions. These functions take pointerl to the ceremonies' respective options and credential structs as arguments, and as such can modify those values as needed. If the functions return an error, the ceremony ends in error. The `Finish...` functions will continue to have all validations required by the specification implemented.
 - Added `ValidateAppID` function conforming to `AuthenticationValidator` which replaces `VerifyAppID` and `EffectiveRPID`
