@@ -173,6 +173,11 @@ func main() {
 	}
 }
 
+func attestationOptions(w http.ResponseWriter, r *http.Request) {
+	r.URL.RawQuery = r.URL.RawQuery + "&username=conformance"
+	startRegistration(w, r)
+}
+
 func startRegistration(w http.ResponseWriter, r *http.Request) {
 	usernames, ok := r.URL.Query()["username"]
 	if !ok || len(usernames) == 0 || usernames[0] == "" {
