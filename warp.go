@@ -1,3 +1,7 @@
+//Package warp is a WebAuthn Relying Party implementation for Go that is not
+//attached to net/http. Bring your own everything, parse the standards-compliant
+//JSON, and pass into the appropriate functions. For full documentation visit
+//https://github.com/e3b0c442/warp
 package warp
 
 //User defines functions which return data required about the authenticating
