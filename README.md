@@ -228,8 +228,8 @@ _warp_ was built with the following goals in mind:
   * Supported: _packed, _fido-u2f_, _none_
   * To be implemented: _tpm_, _android-key_, _android-safetynet_
 * Defined extensions
-  * Supported: _appid_
-  * To be implemented: _txAuthSimple_, _txAuthGeneric_, _authnSel_, _exts_, _uvi_, _loc_, _uvm_, _biometricPerfBounds_
+  * Supported: _appid_, _txAuthSimple_, _txAuthGeneric_
+  * To be implemented:  _authnSel_, _exts_, _uvi_, _loc_, _uvm_, _biometricPerfBounds_
 
 ## High level API
 WebAuthn relying parties have two responsibilities: managing the _registration ceremony_, and managing the _authentication ceremony_. In order to support these ceremonies, interfaces are defined such that the methods will return the required data. 
