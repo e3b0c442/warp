@@ -161,6 +161,7 @@ func main() {
 		w.Write(index)
 	})
 	http.HandleFunc("/register/start", startRegistration)
+	http.HandleFunc("/attestation/options", startRegistration)
 	http.HandleFunc("/register/finish", finishRegistration)
 	http.HandleFunc("/authenticate/start", startAuthentication)
 	http.HandleFunc("/authenticate/finish", finishAuthentication)
