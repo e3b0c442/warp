@@ -161,7 +161,7 @@ func main() {
 		w.Write(index)
 	})
 	http.HandleFunc("/register/start", startRegistration)
-	http.HandleFunc("/attestation/options", startRegistration)
+	http.HandleFunc("/attestation/options", attestationOptions)
 	http.HandleFunc("/register/finish", finishRegistration)
 	http.HandleFunc("/authenticate/start", startAuthentication)
 	http.HandleFunc("/authenticate/finish", finishAuthentication)
@@ -174,27 +174,8 @@ func main() {
 }
 
 func attestationOptions(w http.ResponseWriter, r *http.Request) {
-	u := &user{
-		name:        "conformance",
-		id:          make([]byte, 16),
-		credentials: make(map[string]warp.Credential),
-	}
-	rand.Read(u.id)
-	users["conformance"] = u
-
-	opts, err := warp.StartRegistration(relyingParty, u, warp.Attestation(warp.ConveyanceDirect))
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Start register fail: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	sessions["conformance"] = sessionData{
-		CreationOptions: opts,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(opts)
+	r.URL.RawQuery = r.URL.RawQuery + "&username=conformance"
+	startRegistration(w, r)
 }
 
 func startRegistration(w http.ResponseWriter, r *http.Request) {
