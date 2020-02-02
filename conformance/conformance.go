@@ -136,6 +136,12 @@ func main() {
 	sessions = make(map[string]sessionData)
 
 	http.HandleFunc("/attestation/options", attestationOptions)
+
+	if cert == "" {
+		log.Fatal(http.ListenAndServe(bind, nil))
+	} else {
+		log.Fatal(http.ListenAndServeTLS(bind, cert, key, nil))
+	}
 }
 
 type attestationOptionsBody struct {
