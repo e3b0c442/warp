@@ -174,8 +174,27 @@ func main() {
 }
 
 func attestationOptions(w http.ResponseWriter, r *http.Request) {
-	r.URL.RawQuery = r.URL.RawQuery + "&username=conformance"
-	startRegistration(w, r)
+	u := &user{
+		name:        "conformance",
+		id:          make([]byte, 16),
+		credentials: make(map[string]warp.Credential),
+	}
+	rand.Read(u.id)
+	users["conformance"] = u
+
+	opts, err := warp.StartRegistration(relyingParty, u, warp.Attestation(warp.ConveyanceDirect))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Start register fail: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	sessions["conformance"] = sessionData{
+		CreationOptions: opts,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(opts)
 }
 
 func startRegistration(w http.ResponseWriter, r *http.Request) {
