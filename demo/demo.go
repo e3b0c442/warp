@@ -113,11 +113,13 @@ var (
 	origin string
 	cert   string
 	key    string
+	notls  bool
 )
 
 func init() {
 	flag.StringVar(&bind, "bind", ":3001", "Bind address/port (default: \":3001\")")
 	flag.StringVar(&origin, "origin", "https://localhost:3001", "Fully qualified origin (default: \"https://localhost:3001\")")
+	flag.BoolVar(&notls, "notls", false, "don't enable TLS (e.g. run behind proxy)")
 	flag.StringVar(&cert, "cert", "", "Path to TLS certificate (default: \"\")")
 	flag.StringVar(&key, "key", "", "Path to TLS key (default: \"\")")
 }
@@ -129,7 +131,7 @@ func main() {
 		log.Fatal("Must provide neither or both of key and cert")
 	}
 
-	if cert == "" {
+	if cert == "" && !notls {
 		tmpDir, err := ioutil.TempDir("", "")
 		if err != nil {
 			log.Fatalf("Unable to create temp cert dir: %v", err)
@@ -163,7 +165,11 @@ func main() {
 	http.HandleFunc("/authenticate/start", startAuthentication)
 	http.HandleFunc("/authenticate/finish", finishAuthentication)
 
-	log.Fatal(http.ListenAndServeTLS(bind, cert, key, nil))
+	if notls {
+		log.Fatal(http.ListenAndServe(bind, nil))
+	} else {
+		log.Fatal(http.ListenAndServeTLS(bind, cert, key, nil))
+	}
 }
 
 func startRegistration(w http.ResponseWriter, r *http.Request) {
