@@ -15,7 +15,7 @@ _Requires Go 1.13+_
 
 **This library is still pre-v1, and API stability is not guaranteed. The library will adhere to SemVer and Go backward campatibilty promises.**
 
-*Update 2020-04-13* I am about ready to cut a 1.0 release. After running a couple of implementations, I'm fairly confident in the public API as it currently exists. I did look at achieving FIDO2 conformance, but this requires conforming to the FIDO2 Server spec which has some subtle and not-so-subtle changes/requirements on top of WebAuthn. I'll explore adding a FIDO2 compatibility layer in the future either as a part of this library or as a separate library.
+*Update 2020-04-13* I am about ready to cut a 1.0 release, likely as soon as I finish the TPM attestation format. After running a couple of implementations, I'm fairly confident in the public API as it currently exists. I did look at achieving FIDO2 conformance, but this requires conforming to the FIDO2 Server spec which has some subtle and not-so-subtle changes/requirements on top of WebAuthn. I'll explore adding a FIDO2 compatibility layer in the future either as a part of this library or as a separate library.
 
 ## Contents
 - [Installation](#installation)
@@ -227,7 +227,7 @@ _warp_ was built with the following goals in mind:
   * Supported: ES256, ES384, ES512, EdDSA, RS1, RS256, RS384, RS512, PS256, PS384, PS512
   * To be implemented: None plannned
 * Attestation formats
-  * Supported: _packed, _fido-u2f_, _none_
+  * Supported: _packed_, _fido-u2f_, _none_
   * To be implemented: _tpm_, _android-key_, _android-safetynet_
 * Defined extensions
   * Supported: _appid_, _txAuthSimple_, _txAuthGeneric_
