@@ -15,6 +15,8 @@ _Requires Go 1.13+_
 
 **This library is still pre-v1, and API stability is not guaranteed. The library will adhere to SemVer and Go backward campatibilty promises.**
 
+*Update 2020-04-13* I am about ready to cut a 1.0 release. After running a couple of implementations, I'm fairly confident in the public API as it currently exists. I did look at achieving FIDO2 conformance, but this requires conforming to the FIDO2 Server spec which has some subtle and not-so-subtle changes/requirements on top of WebAuthn. I'll explore adding a FIDO2 compatibility layer in the future either as a part of this library or as a separate library.
+
 ## Contents
 - [Installation](#installation)
 - [Quick start](#quick-start)
