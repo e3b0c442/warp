@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/fxamacker/cbor"
+	"github.com/fxamacker/cbor/v2"
 )
 
 func TestAttestationStatementFormatValid(t *testing.T) {
@@ -628,7 +628,8 @@ func TestVerifyPackedAttestationStatement(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-		certCBOR, err := cbor.Marshal(cert, cbor.CTAP2EncOptions())
+		em, _ := cbor.CTAP2EncOptions().EncMode()
+		certCBOR, err := em.Marshal(cert)
 		if err != nil {
 			return nil, err
 		}
