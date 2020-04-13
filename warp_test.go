@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/fxamacker/cbor"
+	"github.com/fxamacker/cbor/v2"
 )
 
 var goodP256Key *ecdsa.PrivateKey
@@ -111,11 +111,13 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Key gen error: %v", err)
 	}
 
-	goodP256X, err = cbor.Marshal(goodP256Key.PublicKey.X.Bytes(), cbor.CTAP2EncOptions())
+	em, _ := cbor.CTAP2EncOptions().EncMode()
+
+	goodP256X, err = em.Marshal(goodP256Key.PublicKey.X.Bytes())
 	if err != nil {
 		log.Fatalf("X marshal err: %v", err)
 	}
-	goodP256Y, err = cbor.Marshal(goodP256Key.PublicKey.Y.Bytes(), cbor.CTAP2EncOptions())
+	goodP256Y, err = em.Marshal(goodP256Key.PublicKey.Y.Bytes())
 	if err != nil {
 		log.Fatalf("Y marshal err: %v", err)
 	}
@@ -128,7 +130,7 @@ func TestMain(m *testing.M) {
 		Y:         goodP256Y,
 	}
 
-	goodP256Raw, err = cbor.Marshal(goodP256COSE, cbor.CTAP2EncOptions())
+	goodP256Raw, err = em.Marshal(goodP256COSE)
 	if err != nil {
 		log.Fatalf("COSEKey marshal err: %v", err)
 	}

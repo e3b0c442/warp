@@ -16,7 +16,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/fxamacker/cbor"
+	"github.com/fxamacker/cbor/v2"
 )
 
 func TestVerifySignature(t *testing.T) {
@@ -31,15 +31,17 @@ func TestVerifySignature(t *testing.T) {
 		Err       error
 	}
 
-	goodP256X, _ := cbor.Marshal(goodP256Key.PublicKey.X.Bytes(), cbor.CTAP2EncOptions())
-	goodP256Y, _ := cbor.Marshal(goodP256Key.PublicKey.Y.Bytes(), cbor.CTAP2EncOptions())
+	em, _ := cbor.CTAP2EncOptions().EncMode()
 
-	good1024N, _ := cbor.Marshal(good1024Key.PublicKey.N.Bytes(), cbor.CTAP2EncOptions())
+	goodP256X, _ := em.Marshal(goodP256Key.PublicKey.X.Bytes())
+	goodP256Y, _ := em.Marshal(goodP256Key.PublicKey.Y.Bytes())
+
+	good1024N, _ := em.Marshal(good1024Key.PublicKey.N.Bytes())
 	good1024EBuf := &bytes.Buffer{}
 	binary.Write(good1024EBuf, binary.BigEndian, int32(good1024Key.PublicKey.E))
-	good1024E, _ := cbor.Marshal(good1024EBuf.Bytes(), cbor.CTAP2EncOptions())
+	good1024E, _ := em.Marshal(good1024EBuf.Bytes())
 
-	good25519X, _ := cbor.Marshal(good25519Pub, cbor.CTAP2EncOptions())
+	good25519X, _ := em.Marshal(good25519Pub)
 
 	tests := []verifyTest{
 		{
@@ -419,7 +421,8 @@ func TestVerifySignature(t *testing.T) {
 			if test.RawKey != nil {
 				rawKey = test.RawKey
 			} else {
-				rawKey, err = cbor.Marshal(test.COSEKey, cbor.CTAP2EncOptions())
+				em, _ := cbor.CTAP2EncOptions().EncMode()
+				rawKey, err = em.Marshal(test.COSEKey)
 				if err != nil {
 					t.Fatalf("Error marshaling test key: %v", err)
 				}
@@ -454,15 +457,17 @@ func TestDecodePublicKey(t *testing.T) {
 		Err     error
 	}
 
-	goodP256X, _ := cbor.Marshal(goodP256Key.PublicKey.X.Bytes(), cbor.CTAP2EncOptions())
-	goodP256Y, _ := cbor.Marshal(goodP256Key.PublicKey.Y.Bytes(), cbor.CTAP2EncOptions())
+	em, _ := cbor.CTAP2EncOptions().EncMode()
 
-	good1024N, _ := cbor.Marshal(good1024Key.PublicKey.N.Bytes(), cbor.CTAP2EncOptions())
+	goodP256X, _ := em.Marshal(goodP256Key.PublicKey.X.Bytes())
+	goodP256Y, _ := em.Marshal(goodP256Key.PublicKey.Y.Bytes())
+
+	good1024N, _ := em.Marshal(good1024Key.PublicKey.N.Bytes())
 	good1024EBuf := &bytes.Buffer{}
 	binary.Write(good1024EBuf, binary.BigEndian, int32(good1024Key.PublicKey.E))
-	good1024E, _ := cbor.Marshal(good1024EBuf.Bytes(), cbor.CTAP2EncOptions())
+	good1024E, _ := em.Marshal(good1024EBuf.Bytes())
 
-	good25519X, _ := cbor.Marshal(good25519Pub, cbor.CTAP2EncOptions())
+	good25519X, _ := em.Marshal(good25519Pub)
 
 	tests := []decodeTest{
 		{
@@ -549,14 +554,16 @@ func TestDecodeECDSAPublicKey(t *testing.T) {
 		Err       error
 	}
 
-	goodP256X, _ := cbor.Marshal(goodP256Key.PublicKey.X.Bytes(), cbor.CTAP2EncOptions())
-	goodP256Y, _ := cbor.Marshal(goodP256Key.PublicKey.Y.Bytes(), cbor.CTAP2EncOptions())
+	em, _ := cbor.CTAP2EncOptions().EncMode()
 
-	goodP384X, _ := cbor.Marshal(goodP384Key.PublicKey.X.Bytes(), cbor.CTAP2EncOptions())
-	goodP384Y, _ := cbor.Marshal(goodP384Key.PublicKey.Y.Bytes(), cbor.CTAP2EncOptions())
+	goodP256X, _ := em.Marshal(goodP256Key.PublicKey.X.Bytes())
+	goodP256Y, _ := em.Marshal(goodP256Key.PublicKey.Y.Bytes())
 
-	goodP521X, _ := cbor.Marshal(goodP521Key.PublicKey.X.Bytes(), cbor.CTAP2EncOptions())
-	goodP521Y, _ := cbor.Marshal(goodP521Key.PublicKey.Y.Bytes(), cbor.CTAP2EncOptions())
+	goodP384X, _ := em.Marshal(goodP384Key.PublicKey.X.Bytes())
+	goodP384Y, _ := em.Marshal(goodP384Key.PublicKey.Y.Bytes())
+
+	goodP521X, _ := em.Marshal(goodP521Key.PublicKey.X.Bytes())
+	goodP521Y, _ := em.Marshal(goodP521Key.PublicKey.Y.Bytes())
 
 	tests := []decodeECDSATest{
 		{
@@ -794,20 +801,22 @@ func TestDecodeRSAPublicKey(t *testing.T) {
 		Err       error
 	}
 
-	good1024N, _ := cbor.Marshal(good1024Key.PublicKey.N.Bytes(), cbor.CTAP2EncOptions())
+	em, _ := cbor.CTAP2EncOptions().EncMode()
+
+	good1024N, _ := em.Marshal(good1024Key.PublicKey.N.Bytes())
 	good1024EBuf := &bytes.Buffer{}
 	binary.Write(good1024EBuf, binary.BigEndian, int32(good1024Key.PublicKey.E))
-	good1024E, _ := cbor.Marshal(good1024EBuf.Bytes(), cbor.CTAP2EncOptions())
+	good1024E, _ := em.Marshal(good1024EBuf.Bytes())
 
-	good2048N, _ := cbor.Marshal(good2048Key.PublicKey.N.Bytes(), cbor.CTAP2EncOptions())
+	good2048N, _ := em.Marshal(good2048Key.PublicKey.N.Bytes())
 	good2048EBuf := &bytes.Buffer{}
 	binary.Write(good2048EBuf, binary.BigEndian, int32(good2048Key.PublicKey.E))
-	good2048E, _ := cbor.Marshal(good2048EBuf.Bytes(), cbor.CTAP2EncOptions())
+	good2048E, _ := em.Marshal(good2048EBuf.Bytes())
 
-	good4096N, _ := cbor.Marshal(good4096Key.PublicKey.N.Bytes(), cbor.CTAP2EncOptions())
+	good4096N, _ := em.Marshal(good4096Key.PublicKey.N.Bytes())
 	good4096EBuf := &bytes.Buffer{}
 	binary.Write(good4096EBuf, binary.BigEndian, int32(good4096Key.PublicKey.E))
-	good4096E, _ := cbor.Marshal(good4096EBuf.Bytes(), cbor.CTAP2EncOptions())
+	good4096E, _ := em.Marshal(good4096EBuf.Bytes())
 
 	tests := []decodeRSATest{
 		{
@@ -1101,7 +1110,9 @@ func TestDecodeEd25519PublicKey(t *testing.T) {
 		Err       error
 	}
 
-	goodKeyX, err := cbor.Marshal(good25519Pub, cbor.CTAP2EncOptions())
+	em, _ := cbor.CTAP2EncOptions().EncMode()
+
+	goodKeyX, err := em.Marshal(good25519Pub)
 	if err != nil {
 		t.Fatalf("Error marshalig pubkey: %v", err)
 	}
