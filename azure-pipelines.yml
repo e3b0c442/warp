@@ -1,0 +1,47 @@
+trigger:
+  - master
+
+pool:
+  vmImage: "ubuntu-latest"
+
+strategy:
+  matrix:
+    #    go 1.16:
+    #      go_version: "1.16beta1"
+    go 1.15:
+      go_version: "1.15.6"
+    go 1.14:
+      go_version: "1.14.13"
+
+steps:
+  - task: GoTool@0
+    inputs:
+      version: "$(go_version)"
+    displayName: Install Go
+  - task: Go@0
+    inputs:
+      command: "get"
+      arguments: "-d"
+      workingDirectory: "$(System.DefaultWorkingDirectory)"
+    displayName: "Get dependencies"
+  - task: Go@0
+    inputs:
+      command: "get"
+      arguments: "golang.org/x/lint/golint honnef.co/go/tools/cmd/staticcheck"
+      workingDirectory: /tmp
+    displayName: "Install golint and staticcheck"
+  - script: ~/go/bin/golint -set_exit_status ./...
+    displayName: "Run golint"
+  - script: ~/go/bin/staticcheck ./...
+    displayName: "Run staticcheck"
+  - task: Go@0
+    inputs:
+      command: "test"
+      arguments: "-race -coverprofile=coverage.txt -covermode=atomic"
+    displayName: "Run tests"
+  - script: bash <(curl -s https://codecov.io/bash)
+    displayName: "Upload coverage"
+  - task: Go@0
+    inputs:
+      command: "build"
+    displayName: "Run build"

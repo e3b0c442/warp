@@ -1,7 +1,7 @@
 # warp - *W*eb*A*uthn *R*elying *P*arty
 
-[![Build Status](https://travis-ci.org/e3b0c442/warp.svg?branch=master)](https://travis-ci.org/e3b0c442/warp)
-[![GoDoc](https://godoc.org/github.com/e3b0c442/warp?status.svg)](https://godoc.org/github.com/e3b0c442/warp)
+[![Build Status](https://dev.azure.com/e3b0c442/warp/_apis/build/status/e3b0c442.warp?branchName=master)](https://dev.azure.com/e3b0c442/warp/_build/latest?definitionId=3&branchName=master)
+[![Go Reference](https://pkg.go.dev/badge/github.com/e3b0c442/warp.svg)](https://pkg.go.dev/github.com/e3b0c442/warp)
 [![Go Report Card](https://goreportcard.com/badge/github.com/e3b0c442/warp)](https://goreportcard.com/report/github.com/e3b0c442/warp)
 [![codecov](https://codecov.io/gh/e3b0c442/warp/branch/master/graph/badge.svg)](https://codecov.io/gh/e3b0c442/warp)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3625/badge)](https://bestpractices.coreinfrastructure.org/projects/3625)
@@ -11,7 +11,7 @@
 _warp_ is a WebAuthn Relying Party implementation which is intended to be 100% compliant with the [W3C WebAuthn Level 1](https://www.w3.org/TR/webauthn-1/) standard while being HTTP implementation agnostic. It is completely standalone; simply provide your own HTTP server, backend storage and
 session storage.
 
-_Requires Go 1.13+_
+_Requires Go 1.14+_
 
 **This library is still pre-v1, and API stability is not guaranteed. The library will adhere to SemVer and Go backward compatibility promises.**
 
