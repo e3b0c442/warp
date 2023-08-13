@@ -1,0 +1,34 @@
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 'stable'
+          cache: false
+      - uses: golangci/golangci-lint-action@v3
+  test:
+    strategy:
+      matrix:
+        go-version: 
+          - 'stable'
+          - 'unstable'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+      - run: go test -race -coverprofile=coverage.txt -covermode=atomic .
+      - uses: codecov/codecov-action@v3
+        with:
+          file: coverage.txt
